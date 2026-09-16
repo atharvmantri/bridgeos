@@ -1,0 +1,6 @@
+# BridgeOS Agent Guidelines
+
+1. Read AGENTS.md for architecture, standards, and workflow.
+2. Read docs/STATE.md to see current progress.
+3. Read docs/TASKS.md to find the next task to work on.
+4. Keep edits focused, verify with cargo test, and update docs/STATE.md and docs/TASKS.md before completing.

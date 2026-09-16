@@ -1,0 +1,31 @@
+# Rust / Cargo
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Node / Web / Desktop UI
+node_modules/
+dist/
+build/
+.next/
+.tauri/
+
+# Android
+.gradle/
+local.properties
+*.apk
+*.aab
+
+# Temp / Agent artifacts
+scratch/
+tmp/
+*.log
