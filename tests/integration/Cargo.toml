@@ -1,0 +1,18 @@
+[package]
+name = "bridge-integration-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+bridge-core = { workspace = true }
+bridge-protocol = { workspace = true }
+bridge-identity = { workspace = true }
+bridge-transport = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true

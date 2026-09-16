@@ -1,32 +1,32 @@
 # BridgeOS: Current State Ledger
 
-*Last updated: Initial repository bootstrapping (Milestone 0 in progress)*
+*Last updated: 2026-09-16 (Milestone 0 Completed & Verified)*
 
 ---
 
 ### What Currently Works?
-- Canonical multi-agent governance and context operating system established (`AGENTS.md`, thin agent pointers, documentation suite).
+- **Universal Multi-Agent OS:** `AGENTS.md` universal entry point, thin agent pointers (`CLAUDE.md`, `GEMINI.md`, `.cursorrules`), full docs suite (`docs/`).
+- **Workspace & Core Types (`bridge-core`):** `NodeId`, `ProtocolVersion`, `Capabilities` bitmask, `BridgeError`.
+- **Identity & Cryptography (`bridge-identity`):** Ed25519 keypair generation, public key verification, mutual challenge signing and verification over OS CSPRNG.
+- **Wire Protocol & Codec (`bridge-protocol`):** `BRG1` magic header, bounded 16MB length prefix framing, postcard serialization envelopes, `ClientHello`/`ServerHello`/`AuthResponse`/`AuthResult` handshake payloads.
+- **Async Transport (`bridge-transport`):** Length-delimited `FramedStream<T>` over Tokio async read/write with clean EOF handling.
+- **Integration Test Harness (`tests/integration`):** Two local desktop nodes establish authenticated handshake, mutual Ed25519 challenge verification, ping/pong, and data payload transmission over both in-memory duplex and real localhost TCP sockets.
+- **Continuous Integration (`.github/workflows/ci.yml`):** Ubuntu and Windows matrix testing with strict clippy and formatting checks.
 
 ### What Is Partially Implemented?
-- Cargo workspace layout and crates scaffolding underway.
+- `bridge-discovery`: Initial models (`DiscoveredPeer`). mDNS / UDP broadcast logic pending Milestone 1.
+- `bridge-transfer`: Session manifest and Blake3 hash validation model. Chunk streaming engine pending Milestone 4.
 
 ### What Is Broken?
-- Nothing broken; fresh greenfield repository.
-
-### What Is Currently Being Worked On?
-- **BRG-CORE-001**: Cargo workspace creation, shared core types, error handling, and capabilities bitflags.
-- **BRG-IDN-001**: Cryptographic identity primitives (`ed25519-dalek`).
-- **BRG-PROTO-001 & BRG-PROTO-002**: Wire framing, envelopes, and capability handshake definitions.
-- **BRG-TRANS-001**: Async framed transport stream over Tokio.
-- **BRG-INT-001**: Milestone 0 local interconnect test.
+- Nothing. All 15 unit and integration tests pass with zero warnings under `cargo test` and `cargo clippy --all-targets -- -D warnings`.
 
 ### What Was Most Recently Completed?
-- Multi-agent operating manual (`AGENTS.md`), thin pointers (`CLAUDE.md`, `GEMINI.md`, `.cursorrules`), and canonical documentation suite in `docs/`.
+- **Milestone 0 Vertical Slice**: Core workspace, crates, cryptographic identity, framing protocol, async transport, and end-to-end integration tests.
 
 ### Major Known Issues
 - None.
 
 ### What Should The Next Agent Do?
-1. Check `docs/TASKS.md` for active tasks.
-2. If Milestone 0 tasks are in progress, complete the implementation of crates and verify via `cargo test --workspace`.
-3. Keep this file updated upon completing milestones.
+1. Begin **Milestone 1 (BRG-DISC-001)**: Implement mDNS (`mdns-sd`) service advertising and peer discovery in `crates/bridge-discovery`.
+2. Implement local peer directory with heartbeat tracking in `crates/bridge-discovery`.
+3. Add integration test for LAN peer discovery.

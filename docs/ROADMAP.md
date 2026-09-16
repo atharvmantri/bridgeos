@@ -4,14 +4,14 @@ This document outlines the phased development roadmap for BridgeOS from foundati
 
 ---
 
-## Milestone 0: Core Architecture & Authenticated Handshake (CURRENT)
+## Milestone 0: Core Architecture & Authenticated Handshake (COMPLETED)
 **Objective:** Prove core architecture, wire format, capability negotiation, and authenticated peer framing between two local processes.
 - [x] Monorepo workspace setup with modular crates.
 - [x] Universal multi-agent context system (`AGENTS.md`, `docs/`).
-- [ ] Core types, error enums, and node identities (`bridge-core`, `bridge-identity`).
-- [ ] Wire framing codec, message types, and serialization (`bridge-protocol`).
-- [ ] Async transport layer and length-delimited framed stream (`bridge-transport`).
-- [ ] Integration test harness verifying two local nodes handshaking and exchanging messages.
+- [x] Core types, error enums, and node identities (`bridge-core`, `bridge-identity`).
+- [x] Wire framing codec, message types, and serialization (`bridge-protocol`).
+- [x] Async transport layer and length-delimited framed stream (`bridge-transport`).
+- [x] Integration test harness verifying two local nodes handshaking and exchanging messages.
 
 ## Milestone 1: LAN Discovery & Peer Directory
 **Objective:** Devices discover each other on the local network without manual IP entry.

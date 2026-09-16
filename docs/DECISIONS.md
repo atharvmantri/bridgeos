@@ -51,3 +51,13 @@ This document records significant architectural and engineering decisions. Settl
 - **Reasoning:** Allows different coding agents to resume work cold without losing context or requiring massive chat transcripts. Avoids context drift across duplicated files.
 - **Alternatives Considered:** Storing state only in chat instructions (leads to immediate context loss when starting new sessions); duplicating entire manual in each agent file (causes synchronization drift).
 - **Consequences:** Agents must update `docs/STATE.md` and `docs/TASKS.md` when closing work.
+
+---
+
+## ADR-0006: Dedicated Byte Visitor for 64-Byte Ed25519 Signatures
+- **Date:** 2026-09-16
+- **Status:** Accepted
+- **Decision:** Implement explicit byte and sequence visitor serde helper (`signature_serde`) for 64-byte Ed25519 signature arrays in wire handshake frames.
+- **Reasoning:** Rust standard library and `serde` natively derive `Serialize`/`Deserialize` for array lengths up to 32 only. A custom visitor ensures zero-allocation byte slicing during Postcard deserialization and prevents type bloat.
+- **Alternatives Considered:** External crate `serde_big_array` (adds extra dependency); `Vec<u8>` (allocates heap memory on every handshake packet).
+- **Consequences:** Signatures remain stack-allocated fixed-size 64-byte arrays with compact binary encoding.

@@ -7,7 +7,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ## Active & Milestone 0 Tasks
 
 ### BRG-CORE-001: Workspace & Core Types Scaffolding
-- **Status:** IN PROGRESS
+- **Status:** DONE
 - **Subsystem:** core
 - **Goal:** Establish Rust Cargo workspace with strict lints, shared error types, `NodeId`, `DeviceId`, `DeviceType`, `ProtocolVersion`, and `Capabilities` bitflags.
 - **Acceptance Criteria:**
@@ -22,7 +22,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-IDN-001: Ed25519 Cryptographic Node Identity
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** identity
 - **Goal:** Provide generation, signing, and verification of device identity keys using audited primitives.
 - **Acceptance Criteria:**
@@ -37,7 +37,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-PROTO-001: Wire Frame Delimiting & Envelopes
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** protocol
 - **Goal:** Implement the "BRG1" magic-prefixed length-delimited framing and serialization envelope.
 - **Acceptance Criteria:**
@@ -51,7 +51,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-PROTO-002: Capability Negotiation & Handshake Payloads
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** protocol
 - **Goal:** Define structured handshake messages (`ClientHello`, `ServerHello`, `AuthChallenge`, `AuthResponse`, `AuthResult`) with capability intersection logic.
 - **Acceptance Criteria:**
@@ -65,7 +65,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-TRANS-001: Async Framed Transport Stream
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** transport
 - **Goal:** Provide an async framed stream abstraction wrapping `tokio::io::AsyncRead + AsyncWrite`.
 - **Acceptance Criteria:**
@@ -79,7 +79,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-INT-001: Milestone 0 Local Process Interconnect
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** integration
 - **Goal:** Two local Tokio tasks connect over TCP / in-memory duplex, perform mutual handshake, verify identity, and exchange an authenticated message.
 - **Acceptance Criteria:**

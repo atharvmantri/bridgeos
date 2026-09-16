@@ -29,3 +29,12 @@ local.properties
 scratch/
 tmp/
 *.log
+
+#others
+.env
+.env.*
+.env.local
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+
