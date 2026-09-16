@@ -9,6 +9,9 @@ license.workspace = true
 bridge-core = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+mdns-sd = { workspace = true }
 
 [lints]
 workspace = true

@@ -44,6 +44,20 @@ impl NodeId {
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
     }
+
+    pub fn from_hex(s: &str) -> Result<Self, hex::FromHexError> {
+        let mut bytes = [0u8; 32];
+        hex::decode_to_slice(s, &mut bytes)?;
+        Ok(Self(bytes))
+    }
+}
+
+impl std::str::FromStr for NodeId {
+    type Err = hex::FromHexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_hex(s)
+    }
 }
 
 impl fmt::Debug for NodeId {
@@ -82,6 +96,20 @@ impl fmt::Display for DeviceType {
             Self::MacOS => write!(f, "macOS"),
             Self::Unknown => write!(f, "Unknown"),
         }
+    }
+}
+
+impl std::str::FromStr for DeviceType {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.trim().to_ascii_lowercase().as_str() {
+            "windows" => Self::Windows,
+            "android" => Self::Android,
+            "linux" => Self::Linux,
+            "macos" | "darwin" => Self::MacOS,
+            _ => Self::Unknown,
+        })
     }
 }
 
@@ -138,6 +166,7 @@ impl Capabilities {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_protocol_version_compatibility() {
@@ -157,6 +186,26 @@ mod tests {
         let hex_str = id.to_hex();
         assert_eq!(hex_str.len(), 64);
         assert_eq!(id.to_string(), hex_str);
+
+        let parsed = NodeId::from_hex(&hex_str).unwrap();
+        assert_eq!(parsed, id);
+
+        let parsed_str = NodeId::from_str(&hex_str).unwrap();
+        assert_eq!(parsed_str, id);
+
+        assert_eq!(
+            DeviceType::from_str("windows").unwrap(),
+            DeviceType::Windows
+        );
+        assert_eq!(
+            DeviceType::from_str("Android").unwrap(),
+            DeviceType::Android
+        );
+        assert_eq!(DeviceType::from_str("darwin").unwrap(), DeviceType::MacOS);
+        assert_eq!(
+            DeviceType::from_str("unknown_os").unwrap(),
+            DeviceType::Unknown
+        );
     }
 
     #[test]

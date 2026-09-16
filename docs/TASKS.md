@@ -97,10 +97,12 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ## Future Backlog Tasks
 
 ### BRG-DISC-001: mDNS Discovery Daemon
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** discovery
 - **Goal:** Broadcast and discover BridgeOS peers on the local LAN using mDNS / DNS-SD.
 - **Acceptance Criteria:** Discovers peers within 2 seconds of network entry; handles peer departure on heartbeat expiry.
+- **Relevant Files:** `crates/bridge-discovery/src/lib.rs`, `crates/bridge-discovery/src/peer.rs`, `crates/bridge-discovery/src/service.rs`, `crates/bridge-discovery/tests/discovery_test.rs`, `tests/integration/tests/milestone1_discovery.rs`
+- **Dependencies:** BRG-CORE-001
 - **Verification:** `cargo test -p bridge-discovery`
 
 ### BRG-XFER-001: Resumable File Streaming Engine

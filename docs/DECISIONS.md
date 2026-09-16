@@ -61,3 +61,14 @@ This document records significant architectural and engineering decisions. Settl
 - **Reasoning:** Rust standard library and `serde` natively derive `Serialize`/`Deserialize` for array lengths up to 32 only. A custom visitor ensures zero-allocation byte slicing during Postcard deserialization and prevents type bloat.
 - **Alternatives Considered:** External crate `serde_big_array` (adds extra dependency); `Vec<u8>` (allocates heap memory on every handshake packet).
 - **Consequences:** Signatures remain stack-allocated fixed-size 64-byte arrays with compact binary encoding.
+
+---
+
+## ADR-0007: DNS-SD Service Discovery via `mdns-sd` with Heartbeat TTL Pruning
+- **Date:** 2026-09-17
+- **Status:** Accepted
+- **Decision:** Use `mdns-sd` for zero-configuration LAN peer discovery under service type `_bridgeos._tcp.local.`, publishing device identity and capability bitflags via DNS-SD TXT records (`node_id`, `name`, `type`, `caps`, `ver`). Track peers locally in a thread-safe `PeerDirectory` with background TTL pruning and lifecycle event broadcast.
+- **Reasoning:** Standardized DNS-SD enables cross-platform interoperability (Windows, macOS, Linux, Android) without requiring elevated raw socket privileges. TXT records provide pre-connection capability negotiation and node filtering before socket connection. Background TTL pruning reliably detects stale or dropped peers even on silent connection termination.
+- **Alternatives Considered:** Raw UDP multicast beaconing (less standard across OS networks and often blocked or throttled by enterprise routers); central rendezvous server (violates zero-trust LAN offline continuity goal).
+- **Consequences:** Network interfaces must allow multicast DNS traffic (UDP port 5353). A UDP broadcast beacon fallback will be implemented for restricted environments where mDNS is disabled.
+

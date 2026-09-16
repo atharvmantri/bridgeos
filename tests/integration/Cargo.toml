@@ -9,6 +9,7 @@ license.workspace = true
 bridge-core = { workspace = true }
 bridge-protocol = { workspace = true }
 bridge-identity = { workspace = true }
+bridge-discovery = { workspace = true }
 bridge-transport = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

@@ -30,6 +30,7 @@ bridge-transfer = { path = "crates/bridge-transfer" }
 tokio = { version = "1.43", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 bytes = { version = "1.10", features = ["serde"] }
+mdns-sd = "0.21"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
