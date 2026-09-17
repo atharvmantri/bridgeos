@@ -12,9 +12,14 @@ bridge-identity = { workspace = true }
 bridge-discovery = { workspace = true }
 bridge-transport = { workspace = true }
 bridge-transfer = { workspace = true }
+bridge-clipboard = { workspace = true }
+bridge-session = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+hex = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 
 [lints]
 workspace = true

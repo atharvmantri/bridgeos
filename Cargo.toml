@@ -7,6 +7,7 @@ members = [
     "crates/bridge-transport",
     "crates/bridge-transfer",
     "crates/bridge-clipboard",
+    "crates/bridge-notifications",
     "crates/bridge-session",
     "tools/bridge-cli",
     "tests/integration",
@@ -29,6 +30,7 @@ bridge-discovery = { path = "crates/bridge-discovery" }
 bridge-transport = { path = "crates/bridge-transport" }
 bridge-transfer = { path = "crates/bridge-transfer" }
 bridge-clipboard = { path = "crates/bridge-clipboard" }
+bridge-notifications = { path = "crates/bridge-notifications" }
 bridge-session = { path = "crates/bridge-session" }
 
 # Async & Networking
