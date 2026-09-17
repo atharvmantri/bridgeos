@@ -106,8 +106,11 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 - **Verification:** `cargo test -p bridge-discovery`
 
 ### BRG-XFER-001: Resumable File Streaming Engine
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** transfer
 - **Goal:** Stream files in 64KB chunks with Blake3 per-chunk and whole-file hashes.
-- **Acceptance Criteria:** Resumes interrupted transfers from last verified chunk offset.
-- **Verification:** `cargo test -p bridge-transfer`
+- **Acceptance Criteria:** Resumes interrupted transfers from last verified chunk offset; automatically validates per-chunk and root Blake3 checksums; truncates trailing invalid writes on resumption; supports memory and disk targets.
+- **Relevant Files:** `crates/bridge-transfer/src/lib.rs`, `crates/bridge-transfer/src/error.rs`, `crates/bridge-transfer/src/manifest.rs`, `crates/bridge-transfer/src/message.rs`, `crates/bridge-transfer/src/sender.rs`, `crates/bridge-transfer/src/receiver.rs`, `crates/bridge-transfer/tests/transfer_test.rs`, `tests/integration/tests/milestone2_transfer.rs`
+- **Dependencies:** BRG-CORE-001, BRG-PROTO-001, BRG-TRANS-001
+- **Verification:** `cargo test -p bridge-transfer && cargo test --test milestone2_transfer`
+

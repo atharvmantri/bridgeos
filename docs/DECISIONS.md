@@ -72,3 +72,14 @@ This document records significant architectural and engineering decisions. Settl
 - **Alternatives Considered:** Raw UDP multicast beaconing (less standard across OS networks and often blocked or throttled by enterprise routers); central rendezvous server (violates zero-trust LAN offline continuity goal).
 - **Consequences:** Network interfaces must allow multicast DNS traffic (UDP port 5353). A UDP broadcast beacon fallback will be implemented for restricted environments where mDNS is disabled.
 
+---
+
+## ADR-0008: Chunked Resumable File Streaming Engine with Blake3 Validation
+- **Date:** 2026-09-17
+- **Status:** Accepted
+- **Decision:** Stream files in fixed 64KB chunks (`CHUNK_SIZE`) with per-chunk Blake3 checksums and a whole-file Blake3 root hash. Destination files are written to `.part` files during transit, truncated to the highest contiguous verified 64KB chunk boundary on resumption, and atomically finalized upon full file hash verification.
+- **Reasoning:** 64KB chunks fit well within TCP/QUIC frames without fragmenting buffers or causing memory exhaustion. Per-chunk Blake3 hashes allow instant rejection of corrupted chunks without wasting bandwidth on the remainder of the file. Automatic truncation of `.part` files to the verified chunk boundary cleanly handles unexpected disconnections mid-chunk without corrupting state.
+- **Alternatives Considered:** Streaming raw file streams without chunk checksums (rejected: requires whole-file retransfer if corruption occurs); SHA-256 chunking (rejected: Blake3 provides significantly higher throughput on both modern desktop CPUs and mobile devices).
+- **Consequences:** File manifests must calculate whole-file Blake3 hashes before transfer; receivers track chunk sets and write verified chunks into temporary `.part` files.
+
+

@@ -7,9 +7,14 @@ license.workspace = true
 
 [dependencies]
 bridge-core = { workspace = true }
+bridge-protocol = { workspace = true }
 blake3 = { workspace = true }
+postcard = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+hex = { workspace = true }
 
 [lints]
 workspace = true

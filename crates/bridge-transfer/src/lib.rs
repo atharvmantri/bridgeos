@@ -2,23 +2,14 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+pub mod error;
+pub mod manifest;
+pub mod message;
+pub mod receiver;
+pub mod sender;
 
-/// Standard file streaming chunk size: 64 kilobytes.
-pub const CHUNK_SIZE: usize = 64 * 1024;
-
-/// Metadata manifest for a file transfer session.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileManifest {
-    pub file_id: String,
-    pub filename: String,
-    pub total_size: u64,
-    pub total_chunks: u32,
-    pub blake3_root_hash: [u8; 32],
-}
-
-impl FileManifest {
-    pub fn compute_hash(data: &[u8]) -> [u8; 32] {
-        *blake3::hash(data).as_bytes()
-    }
-}
+pub use error::{Result, TransferError};
+pub use manifest::{create_manifest_from_bytes, create_manifest_from_file};
+pub use message::{FileChunk, FileManifest, TransferMessage, CHUNK_SIZE};
+pub use receiver::FileReceiver;
+pub use sender::FileSender;

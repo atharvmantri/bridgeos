@@ -11,6 +11,7 @@ bridge-protocol = { workspace = true }
 bridge-identity = { workspace = true }
 bridge-discovery = { workspace = true }
 bridge-transport = { workspace = true }
+bridge-transfer = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

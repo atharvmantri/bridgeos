@@ -30,3 +30,20 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Documented architectural decision ADR-0007 in `docs/DECISIONS.md`.
   - Updated `docs/STATE.md` and `docs/TASKS.md` with verified status.
 
+---
+
+### 2026-09-17: Milestone 2 Resumable File Streaming Engine (BRG-XFER-001)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Implemented `bridge-transfer` chunk streaming engine with fixed 64KB chunks (`CHUNK_SIZE`).
+  - Implemented `FileSender` supporting file and memory streaming with arbitrary chunk offset seeking.
+  - Implemented `FileReceiver` supporting directory destinations with `.part` staging files, and memory targets.
+  - Designed and implemented automatic `.part` file truncation to the last contiguous verified 64KB chunk boundary for interrupted transfer resumption.
+  - Implemented Blake3 per-chunk integrity verification and whole-file root hash verification.
+  - Implemented `TransferMessage` wire serialization and `bridge_protocol::DataFrame` channel encapsulation.
+  - Added unit test suite covering chunk validation, corrupted chunk rejection, root hash mismatch detection, empty files, and resumption.
+  - Implemented Milestone 2 end-to-end integration tests (`milestone2_transfer.rs`) demonstrating full TCP file streaming and mid-flight network interruption with resumption.
+  - Documented architectural decision ADR-0008 in `docs/DECISIONS.md`.
+  - Updated `docs/STATE.md` and `docs/TASKS.md`.
+
+
