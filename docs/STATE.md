@@ -1,6 +1,6 @@
 # BridgeOS: Current State Ledger
 
-*Last updated: 2026-09-17 (Milestone 1 BRG-DISC-002 Completed & Verified)*
+*Last updated: 2026-09-17 (BRG-NOTIF-001 Completed & Verified)*
 
 ---
 
@@ -30,40 +30,55 @@
   - Pluggable platform clipboard backend abstraction (`ClipboardBackend`) with thread-safe `MemoryClipboardBackend`.
   - Native Windows backend (`WindowsClipboardBackend`) utilizing Win32 message-only window (`HWND_MESSAGE`), `AddClipboardFormatListener`, `WM_CLIPBOARDUPDATE` event dispatch, Unicode UTF-16 (`CF_UNICODETEXT`) reading/writing, exponential backoff contention retry, and clean thread teardown.
   - Wire protocol integration over `DataFrame` channel 1 (`DataFrame::CHANNEL_CLIPBOARD`).
+- **Cross-Device Notification Mirroring (`bridge-notifications`):**
+  - Portable `NotificationEntry` envelope supporting app ID, title, text, urgency (`Low`/`Normal`/`High`/`Critical`), state (`Active`/`Dismissed`/`Expired`), icon hash/data, is_ongoing flag, and size enforcement.
+  - Four wire message types: `Post`, `Dismiss`, `ActionInvoked`, `ClearAll` — Postcard-encoded over `DataFrame::CHANNEL_NOTIFICATIONS` (channel 3).
+  - Action synchronization: `Dismiss`, `Open`, `Reply { text }`, and `Custom { label, key }` actions.
+  - `NotificationGuard`: O(1) dedup via Blake3 hash ring buffer (256 cap) with LRU eviction, dismiss state tracking, and `ClearAll` bulk dismiss.
+  - `NotificationPolicy`: privacy filter blocking 2FA/OTP codes, banking apps, password manager apps, with configurable urgency threshold gating and ongoing notification suppression. Default/strict/permissive profiles.
+  - `NotificationSyncEngine`: async inbound frame handler with policy + dedup pipeline, outbound message builders, broadcast event channel (`NotificationSyncEvent`), and active notification snapshot per origin.
 - **Developer Multi-Node CLI Harness (`tools/bridge-cli`)**:
   - Interactive terminal executable `bridge-cli` with subcommands: `node`, `discover`, `peers`, `pair`, `trust`, `ping`, `send-file`, `identity`.
   - Enables launching and manually testing multiple BridgeOS nodes across terminals on localhost or local LAN.
   - Default native OS clipboard integration on Windows with `--memory-clipboard` flag available for isolated/testing runs.
   - Full end-to-end integration of `bridge-core`, `bridge-identity`, `bridge-protocol`, `bridge-discovery`, `bridge-transport`, `bridge-transfer`, `bridge-clipboard`, and `bridge-session`.
-- **Integration Test Suite (`tests/integration`, `tools/bridge-cli/tests`, `crates/bridge-identity/tests`, `crates/bridge-clipboard/tests`, `crates/bridge-session/tests`):**
+- **Protocol Interoperability Fixtures (`tests/interop/fixtures/`):**
+  - 15 canonical golden binary/JSON vectors covering: BRG1 framing, NodeId derivation, ClientHello/ServerHello/AuthResponse/AuthResult handshake frames, Ping/Pong/Disconnect control frames, SAS derivation, Pairing Request/Response/Confirm frames, Clipboard Sync frame, and UDP beacon announcement.
+  - Self-verifying Rust test (`tests/integration/tests/interop_fixtures.rs`) generates and validates all vectors on every `cargo test` run.
+- **Integration Test Suite (`tests/integration`, `tools/bridge-cli/tests`, `crates/bridge-identity/tests`, `crates/bridge-clipboard/tests`, `crates/bridge-session/tests`, `crates/bridge-notifications/tests`):**
   - Milestone 0: Local in-memory and TCP socket mutual Ed25519 authentication, capability negotiation, and framed data transfer.
   - Milestone 1: Multi-node live mDNS discovery AND UDP broadcast beacon discovery, dynamic socket resolution, automated TCP connection establishment, and authenticated session negotiation.
   - Milestone 2: Multi-node TCP file streaming, whole-file root hash validation, and interrupted session resumption from last verified chunk offset.
   - Milestone 2 Trust: In-memory and SQLite disk persistence, public key consistency enforcement, impersonation attack rejection, peer revocation, and symmetric SAS pairing finalization.
   - Milestone 3 Clipboard: Payload hashing, wire encoding/decoding, bounded ring-buffer deduplication, loopback echo suppression, sequence tracking, policy enforcement, image synchronization, and native Win32 clipboard read/write/event notification tests.
+  - Milestone 3 Notifications: Wire roundtrip (all message types), dedup same/updated content, dismiss lifecycle, clear-all, 2FA policy blocking, outbound builders, size limit enforcement, active snapshot query.
   - CLI & Session Harness: Command-line parsing, node lifecycle, authenticated ping/pong roundtrips, multi-chunk file transfer, cryptographic signature rejection, SAS pairing ceremonies, and application channel gating.
 - **Continuous Integration (`.github/workflows/ci.yml`):** Ubuntu and Windows matrix testing with strict clippy and formatting checks.
 
 ### What Is Partially Implemented?
-- None in current milestones (M0, M1, M2 transfer & pairing, and M3 clipboard sync core with Windows integration are fully implemented and verified).
+- **Android Client (`apps/android/`):** Root Gradle project scaffold only (`settings.gradle.kts`, `build.gradle.kts`). No Kotlin source modules yet.
 
 ### What Is Broken?
-- Nothing. All 47 unit and integration tests pass with zero warnings under `cargo test` and `cargo clippy --all-targets -- -D warnings`.
+- `backend::windows::tests::test_windows_clipboard_set_get_unicode` is flaky when run with multi-threaded test harness (`GetLastError=1418` clipboard contention). Use `cargo test -p bridge-clipboard -- --test-threads=1` for reliable Windows clipboard test runs.
 
 ### What Was Most Recently Completed?
-- **Native Windows Clipboard Backend (`BRG-WINCLIP-001`)**:
-  - Modularized `crates/bridge-clipboard/src/backend/` into `mod.rs`, `memory.rs`, and `windows.rs`.
-  - Implemented `WindowsClipboardBackend` with Win32 message-only window (`HWND_MESSAGE`) and `AddClipboardFormatListener` for zero-polling, event-driven clipboard monitoring.
-  - Implemented safe Unicode UTF-16 (`CF_UNICODETEXT`) reading and writing via `GlobalAlloc`, `GlobalLock`, `GlobalUnlock`, and `SetClipboardData`.
-  - Added exponential backoff retry for OS clipboard contention (e.g., when another application holds the clipboard open).
-  - Coordinated thread synchronization with `sync_lock: Arc<Mutex<()>>` preventing race conditions between the listener message pump and direct read/write calls.
-  - Connected `WindowsClipboardBackend` into `bridge-cli node` by default on Windows, with `--memory-clipboard` flag for headless/testing runs.
-  - Documented ADR-0014 in `docs/DECISIONS.md`.
+- **Cross-Device Notification Mirroring Engine (`BRG-NOTIF-001`)**:
+  - New `crates/bridge-notifications` crate registered in workspace.
+  - `NotificationEntry` portable envelope with size enforcement (`title` 256B, `text` 4096B, icon 64KB).
+  - `NotificationUrgency` / `NotificationState` / `NotificationAction` typed enums.
+  - `NotificationMessage` wire enum serialized with Postcard over `CHANNEL_NOTIFICATIONS`.
+  - `NotificationGuard` bounded LRU ring-buffer dedup (cap 256) with dismiss and clear-all tracking.
+  - `NotificationPolicy` privacy filter with 2FA/banking/password-manager/medical keyword and app-ID blocklists.
+  - `NotificationSyncEngine` async inbound/outbound orchestrator with tokio broadcast event channel.
+  - 28 tests (11 unit + 17 integration) — all passing, clippy clean, `cargo fmt` clean.
+  - Committed golden interop protocol fixtures (15 binary/JSON vectors) in `tests/interop/fixtures/`.
+  - Bootstrapped Android project Gradle scaffold.
 
 ### Major Known Issues
 - None.
 
 ### What Should The Next Agent Do?
-1. Implement cross-device Notification Mirroring protocol and engine (`BRG-NOTIF-001` in `crates/bridge-notifications`).
-2. Implement Standalone Relay daemon service (`services/relay`).
-3. Connect native Windows notification listener / toast emitter.
+1. Connect `bridge-notifications` into `bridge-session` / `bridge-cli` (analogous to BRG-CLIP-002 clipboard integration).
+2. Implement Windows native notification toast emitter backend using Windows Runtime (WinRT) toast APIs or `win32-toast`.
+3. Continue Android client implementation: implement `core/` Kotlin module with BRG1 framing, NodeId derivation, and ClientHello/ServerHello handshake against golden fixtures.
+4. Implement Standalone Relay daemon service (`services/relay`).

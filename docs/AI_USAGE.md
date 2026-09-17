@@ -132,3 +132,20 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Documented architectural decision ADR-0014 in `docs/DECISIONS.md`.
   - Updated `docs/STATE.md` and `docs/TASKS.md`.
 
+---
+
+### 2026-09-17: Notification Mirroring Engine & Protocol Interop Fixtures (BRG-NOTIF-001)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Designed and implemented `crates/bridge-notifications` — a new workspace crate for cross-device notification mirroring.
+  - Defined `NotificationEntry` portable envelope with size enforcement (title 256B, text 4096B, icon 64KB), `NotificationUrgency` (Low/Normal/High/Critical), `NotificationState` (Active/Dismissed/Expired), and `NotificationAction` (Dismiss/Open/Reply/Custom).
+  - Implemented `NotificationMessage` wire enum (Post/Dismiss/ActionInvoked/ClearAll) Postcard-encoded over `DataFrame::CHANNEL_NOTIFICATIONS` (channel 3), consistent with existing protocol channel allocation.
+  - Implemented `NotificationGuard`: bounded LRU ring-buffer (256 entries) for O(1) dedup by Blake3 content hash, with dismiss state tracking and ClearAll bulk dismiss.
+  - Implemented `NotificationPolicy`: privacy filter with app-ID blocklists (banking, authenticators, password managers) and keyword blocklists (2FA/OTP, financial keywords), plus urgency threshold gating and ongoing notification suppression. Three built-in profiles: default, strict, permissive.
+  - Implemented `NotificationSyncEngine`: async inbound frame handler applying policy + dedup pipeline, four outbound message builders, Tokio broadcast event channel (`NotificationSyncEvent`), and active notification snapshot per origin.
+  - Authored 28 tests (11 guard/policy unit tests + 17 integration tests) covering all message wire roundtrips, dedup same/updated content, dismiss lifecycle, clear-all, 2FA policy blocking, sensitive outbound suppression, outbound builders, size limits, and active snapshot query.
+  - Generated 15 canonical golden interop fixtures (`tests/interop/fixtures/`) for every protocol message type: BRG1 framing, NodeId derivation, ClientHello/ServerHello/AuthResponse/AuthResult handshake, Ping/Pong/Disconnect control, SAS derivation, Pairing Request/Response/Confirm, Clipboard Sync, and UDP beacon announcement.
+  - Implemented self-verifying Rust test (`tests/integration/tests/interop_fixtures.rs`) that generates and round-trips all fixtures on every `cargo test` run — forming the wire compatibility contract for Android client implementation.
+  - Bootstrapped Android project Gradle scaffold (`apps/android/settings.gradle.kts`, `apps/android/build.gradle.kts`).
+  - Added `BRG-NOTIF-002`, `BRG-ANDROID-001`, and `BRG-RELAY-001` task entries to `docs/TASKS.md`.
+  - Updated `docs/STATE.md` and `docs/DECISIONS.md`.

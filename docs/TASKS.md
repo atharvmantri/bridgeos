@@ -238,19 +238,61 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-NOTIF-001: Cross-Device Notification Mirroring Protocol & Engine
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** continuity
 - **Goal:** Design and implement cross-device notification synchronization (`bridge-notifications`) over protocol channel 3 (`CHANNEL_NOTIFICATIONS`) with notification state, actions (dismiss, reply), deduplication, and privacy filtering.
 - **Acceptance Criteria:**
-  - Standardized notification envelope (`NotificationEntry`) supporting app ID, title, text, timestamp, urgency, icon hash, and dismiss/action flags.
-  - Bounded ring buffer for active notifications and dismiss synchronization.
-  - Action synchronization allowing remote dismissal and canned text reply transmission.
-  - Privacy policy filtering sensitive notification categories (banking, 2FA codes, password managers).
-  - Integration with `bridge-session` application channels.
+  - Standardized notification envelope (`NotificationEntry`) supporting app ID, title, text, timestamp, urgency, icon hash, and dismiss/action flags. ✅
+  - Bounded ring buffer for active notifications and dismiss synchronization. ✅
+  - Action synchronization allowing remote dismissal and canned text reply transmission. ✅
+  - Privacy policy filtering sensitive notification categories (banking, 2FA codes, password managers). ✅
+  - Integration with `bridge-session` application channels. *(follow-on: BRG-NOTIF-002)*
 - **Relevant Files:** `crates/bridge-notifications/`
 - **Dependencies:** BRG-CORE-001, BRG-PROTO-001, BRG-SESSION-001
 - **Verification:** `cargo test -p bridge-notifications`
 
+---
 
+### BRG-NOTIF-002: Notification Session Integration & Windows Toast Emitter
+- **Status:** TODO
+- **Subsystem:** continuity
+- **Goal:** Connect `NotificationSyncEngine` into `bridge-session` trusted session channels (analogous to BRG-CLIP-002), and implement a native Windows WinRT toast emitter backend.
+- **Acceptance Criteria:**
+  - Outgoing local OS notifications forwarded to all connected trusted peer sessions via `CHANNEL_NOTIFICATIONS`.
+  - Incoming notification frames validated and applied to local OS notification center only if peer is `Trusted`.
+  - Native Windows `WindowsNotificationBackend` using WinRT toast APIs or `windows-notifications` crate.
+  - CLI integration in `bridge-cli node`.
+  - Integration tests verifying trust gating on notification channel.
+- **Relevant Files:** `crates/bridge-notifications/`, `crates/bridge-session/`, `tools/bridge-cli/`
+- **Dependencies:** BRG-NOTIF-001, BRG-SESSION-001
+- **Verification:** `cargo test --workspace`
 
+---
 
+### BRG-ANDROID-001: Android Core Protocol Module (Kotlin)
+- **Status:** TODO
+- **Subsystem:** android
+- **Goal:** Implement the `core/` Kotlin module in `apps/android/` — BRG1 framing, NodeId derivation, ClientHello/ServerHello handshake — verified against golden interop fixtures in `tests/interop/fixtures/`.
+- **Acceptance Criteria:**
+  - Kotlin `BridgeFrame` encoder/decoder matching BRG1 magic + 4-byte BE length framing exactly.
+  - `NodeId` derivation (SHA-256 of Ed25519 public key bytes) matching `node_id_derivation.json` golden vector.
+  - `ClientHello` / `ServerHello` Postcard deserialization matching `handshake_client_hello.bin` / `handshake_server_hello.bin`.
+  - Interop test reading golden fixtures and asserting byte-exact decode.
+- **Relevant Files:** `apps/android/core/`, `tests/interop/fixtures/`
+- **Dependencies:** BRG-PROTO-001 (interop fixtures must already exist)
+- **Verification:** `./gradlew :core:test` in `apps/android/`
+
+---
+
+### BRG-RELAY-001: Standalone Encrypted Relay Daemon
+- **Status:** TODO
+- **Subsystem:** relay
+- **Goal:** Implement a standalone Rust relay daemon (`services/relay`) providing zero-knowledge end-to-end encrypted relay for peers that cannot connect directly (NAT traversal fallback).
+- **Acceptance Criteria:**
+  - Relay daemon accepts authenticated peer connections and routes opaque encrypted frames between paired peers.
+  - Zero-knowledge: relay cannot read payload content.
+  - Rate limiting and session timeout enforcement.
+  - Relay address configurable in `bridge-cli`.
+- **Relevant Files:** `services/relay/`
+- **Dependencies:** BRG-CORE-001, BRG-PROTO-001, BRG-IDN-001
+- **Verification:** `cargo test -p bridge-relay`
