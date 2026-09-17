@@ -1,18 +1,25 @@
 use anyhow::{bail, Context, Result};
-use bridge_core::{Capabilities, DeviceType, ProtocolVersion};
+use bridge_clipboard::{
+    ClipboardPolicy, ClipboardSyncEngine, ClipboardSyncEvent, MemoryClipboardBackend,
+};
+use bridge_core::{Capabilities, DeviceType, NodeId};
 use bridge_discovery::{
     DiscoveryConfig, DiscoveryEvent, UdpConfig, UnifiedDiscovery, UnifiedDiscoveryConfig,
     UnifiedDiscoveryMode,
 };
-use bridge_identity::{IdentityKey, PublicKey};
-use bridge_protocol::{AuthResult, ControlFrame, DataFrame, Frame, HandshakeFrame, ServerHello};
+use bridge_identity::{IdentityStorage, TrustStore};
+use bridge_protocol::{ControlFrame, DataFrame, Frame};
+use bridge_session::{ActiveSession, InteractiveCliConfirm};
 use bridge_transfer::{FileReceiver, TransferMessage};
 use bridge_transport::FramedStream;
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
-use tracing::{debug, error, warn};
+use tokio::sync::{mpsc, Mutex};
+use tracing::{debug, error, info, warn};
 
 /// Configuration parameters for running an active BridgeOS node.
 #[derive(Debug, Clone)]
@@ -21,6 +28,7 @@ pub struct NodeConfig {
     pub port: u16,
     pub device_type: DeviceType,
     pub receive_dir: PathBuf,
+    pub data_dir: PathBuf,
     pub broadcast_port: u16,
     pub enable_mdns: bool,
     pub enable_udp: bool,
@@ -37,10 +45,56 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
             )
         })?;
 
-    let identity = Arc::new(IdentityKey::generate());
+    tokio::fs::create_dir_all(&config.data_dir)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to create data directory: {}",
+                config.data_dir.display()
+            )
+        })?;
+
+    // 1. Persistent Node Identity & Trust Store
+    let key_path = config.data_dir.join("identity").join("secret.key");
+    let identity = Arc::new(
+        IdentityStorage::load_or_generate(&key_path)
+            .context("Failed to initialize node identity")?,
+    );
     let node_id = identity.node_id();
 
-    // 1. Establish TCP Listener
+    let trust_store = Arc::new(
+        TrustStore::open(config.data_dir.join("trust.db"))
+            .context("Failed to open persistent trust store")?,
+    );
+
+    // 2. Clipboard Synchronization Engine
+    let clip_backend = Arc::new(MemoryClipboardBackend::new());
+    let clip_engine = Arc::new(ClipboardSyncEngine::new(
+        node_id,
+        clip_backend.clone(),
+        ClipboardPolicy::default(),
+    ));
+    let _clip_monitor = clip_engine.start_monitor();
+
+    // Registry of active trusted peer channels for outbound clipboard broadcasting
+    let active_sessions = Arc::new(Mutex::new(HashMap::<NodeId, mpsc::Sender<DataFrame>>::new()));
+
+    // Spawn outbound clipboard broadcaster
+    let active_sessions_clip = active_sessions.clone();
+    let mut clip_event_rx = clip_engine.subscribe();
+    let _clip_broadcast_task = tokio::spawn(async move {
+        while let Ok(event) = clip_event_rx.recv().await {
+            if let ClipboardSyncEvent::OutgoingBroadcastReady { frame, .. } = event {
+                let sessions = active_sessions_clip.lock().await;
+                for (peer_id, tx) in sessions.iter() {
+                    debug!(%peer_id, "Broadcasting clipboard update to active trusted peer");
+                    let _ = tx.send(frame.clone()).await;
+                }
+            }
+        }
+    });
+
+    // 3. Establish TCP Listener
     let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), config.port);
     let listener = TcpListener::bind(bind_addr)
         .await
@@ -54,6 +108,7 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
     println!("  Node ID:       {node_id}");
     println!("  Device Type:   {:?}", config.device_type);
     println!("  TCP Listener:  0.0.0.0:{actual_port}");
+    println!("  Data Dir:      {}", config.data_dir.display());
     println!("  Receive Dir:   {}", config.receive_dir.display());
     println!("  mDNS Enabled:  {}", config.enable_mdns);
     println!(
@@ -63,7 +118,7 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
     println!("============================================================");
     println!("Press Ctrl+C to shut down gracefully.\n");
 
-    // 2. Configure Unified Discovery
+    // 4. Configure Unified Discovery
     let mode = match (config.enable_mdns, config.enable_udp) {
         (true, true) => UnifiedDiscoveryMode::Both,
         (true, false) => UnifiedDiscoveryMode::MdnsOnly,
@@ -108,7 +163,7 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
 
     let mut event_rx = discovery.subscribe();
 
-    // 3. Spawn Discovery Event Logger
+    // 5. Spawn Discovery Event Logger
     let disc_task = tokio::spawn(async move {
         while let Ok(event) = event_rx.recv().await {
             match event {
@@ -134,7 +189,7 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
         }
     });
 
-    // 4. Accept Connections Loop
+    // 6. Accept Connections Loop
     let receive_dir = Arc::new(config.receive_dir.clone());
     let server_name = Arc::new(config.name.clone());
 
@@ -146,6 +201,9 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
                         let identity_clone = identity.clone();
                         let receive_dir_clone = receive_dir.clone();
                         let server_name_clone = server_name.clone();
+                        let trust_store_clone = trust_store.clone();
+                        let clip_engine_clone = clip_engine.clone();
+                        let active_sessions_clone = active_sessions.clone();
 
                         tokio::spawn(async move {
                             if let Err(e) = handle_connection(
@@ -154,8 +212,11 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
                                 identity_clone,
                                 receive_dir_clone,
                                 server_name_clone,
+                                trust_store_clone,
+                                clip_engine_clone,
+                                active_sessions_clone,
                             ).await {
-                                warn!(remote = %remote_addr, error = %e, "Connection ended with error");
+                                warn!(remote = %remote_addr, error = %e, "Connection closed with error");
                             }
                         });
                     }
@@ -181,137 +242,142 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
     Ok(())
 }
 
-/// Handles an incoming authenticated peer connection.
+/// Handles an incoming authenticated peer connection using `ActiveSession`.
+#[allow(clippy::too_many_arguments, clippy::implicit_hasher)]
 pub async fn handle_connection(
     socket: TcpStream,
     remote_addr: SocketAddr,
-    identity: Arc<IdentityKey>,
+    identity: Arc<bridge_identity::IdentityKey>,
     receive_dir: Arc<PathBuf>,
     server_name: Arc<String>,
+    trust_store: Arc<TrustStore>,
+    clip_engine: Arc<ClipboardSyncEngine>,
+    active_sessions: Arc<Mutex<HashMap<NodeId, mpsc::Sender<DataFrame>>>>,
 ) -> Result<()> {
-    let mut framed = FramedStream::new(socket);
+    let mut session = ActiveSession::server_handshake(
+        socket,
+        identity,
+        server_name.to_string(),
+        DeviceType::Windows,
+        trust_store,
+        Some(clip_engine.clone()),
+        Some((*receive_dir).clone()),
+    )
+    .await
+    .context("Handshake failed")?;
 
-    // 1. Await ClientHello
-    let hello_frame = framed
-        .recv_frame()
-        .await
-        .context("Failed to read ClientHello")?
-        .context("Client disconnected before sending ClientHello")?;
+    let (outbound_tx, mut outbound_rx) = mpsc::channel::<DataFrame>(32);
 
-    let client_hello = match hello_frame {
-        Frame::Handshake(HandshakeFrame::ClientHello(h)) => h,
-        other => bail!("Expected ClientHello from {remote_addr}, got {other:?}"),
-    };
-
-    let client_node_id = client_hello.node_id;
-    let client_name = client_hello.device_name.clone();
-
-    // 2. Reconstruct Client's PublicKey from NodeId
-    let client_pub = PublicKey::from_bytes(&client_node_id.0)
-        .context("Invalid Ed25519 public key in ClientHello NodeId")?;
-
-    // 3. Send ServerHello
-    let server_nonce = rand::random::<[u8; 32]>();
-    let negotiated_caps = client_hello.capabilities.intersect(&Capabilities::all());
-    let server_hello = ServerHello {
-        agreed_version: ProtocolVersion::CURRENT,
-        node_id: identity.node_id(),
-        device_name: (*server_name).clone(),
-        server_nonce,
-        negotiated_capabilities: negotiated_caps,
-    };
-
-    framed
-        .send_frame(&Frame::Handshake(HandshakeFrame::ServerHello(server_hello)))
-        .await
-        .context("Failed to send ServerHello")?;
-
-    // 4. Await AuthResponse
-    let auth_frame = framed
-        .recv_frame()
-        .await
-        .context("Failed to read AuthResponse")?
-        .context("Client disconnected before sending AuthResponse")?;
-
-    let auth_resp = match auth_frame {
-        Frame::Handshake(HandshakeFrame::AuthResponse(r)) => r,
-        other => bail!("Expected AuthResponse, got {other:?}"),
-    };
-
-    // 5. Verify Challenge Signature
-    if let Err(e) = client_pub.verify_handshake_challenge(
-        &client_hello.client_nonce,
-        &server_nonce,
-        &auth_resp.signature,
-    ) {
-        let _ = framed
-            .send_frame(&Frame::Handshake(HandshakeFrame::AuthResult(
-                AuthResult::failed(format!(
-                    "Cryptographic challenge signature verification failed: {e}"
-                )),
-            )))
-            .await;
-        bail!("Client {client_name} ({client_node_id}) signature verification failed: {e}");
+    if session.state.is_trusted() {
+        println!(
+            "\n[Session] Connected with \x1b[1;32mTRUSTED\x1b[0m peer '{}' ({}) from {}",
+            session.remote_name, session.remote_node_id, remote_addr
+        );
+        active_sessions
+            .lock()
+            .await
+            .insert(session.remote_node_id, outbound_tx.clone());
+    } else {
+        println!(
+            "\n[Session] Connected with \x1b[1;33mUNTRUSTED\x1b[0m peer '{}' ({}) from {}. Application channels blocked pending pairing.",
+            session.remote_name, session.remote_node_id, remote_addr
+        );
     }
 
-    // 6. Send AuthResult::ok()
-    framed
-        .send_frame(&Frame::Handshake(HandshakeFrame::AuthResult(
-            AuthResult::ok(),
-        )))
-        .await
-        .context("Failed to send AuthResult")?;
-
-    println!(
-        "[Session] Authenticated connection established with '{client_name}' ({client_node_id}) from {remote_addr}"
-    );
-
-    // 7. Process session frames
     loop {
-        let frame_opt = framed.recv_frame().await.context("Failed to read frame")?;
-        let Some(frame) = frame_opt else {
-            println!("[Session] Peer '{client_name}' disconnected (EOF)");
-            break;
-        };
+        tokio::select! {
+            frame_res = session.framed.recv_frame() => {
+                let frame_opt = frame_res.context("Failed to read frame")?;
+                let Some(frame) = frame_opt else {
+                    println!("[Session] Peer '{}' disconnected (EOF)", session.remote_name);
+                    break;
+                };
 
-        match frame {
-            Frame::Control(ControlFrame::Ping { nonce }) => {
-                debug!(nonce, "Received Ping from client");
-                framed
-                    .send_frame(&Frame::Control(ControlFrame::Pong { nonce }))
-                    .await
-                    .context("Failed to send Pong")?;
-            }
-            Frame::Control(ControlFrame::Pong { .. }) => {}
-            Frame::Control(ControlFrame::Disconnect { reason }) => {
-                println!("[Session] Peer '{client_name}' disconnected gracefully: {reason:?}");
-                break;
-            }
-            Frame::Data(DataFrame { channel, payload }) => {
-                if channel == DataFrame::CHANNEL_FILE_TRANSFER {
-                    handle_file_transfer(&payload, &mut framed, &receive_dir, &client_name).await?;
-                } else {
-                    debug!(channel, "Received data on non-file channel");
+                match frame {
+                    Frame::Control(ControlFrame::Ping { nonce }) => {
+                        debug!(nonce, "Received Ping from peer");
+                        session.framed.send_frame(&Frame::Control(ControlFrame::Pong { nonce })).await?;
+                    }
+                    Frame::Control(ControlFrame::Pong { .. }) => {}
+                    Frame::Control(ControlFrame::Disconnect { reason }) => {
+                        println!("[Session] Peer '{}' disconnected gracefully: {reason:?}", session.remote_name);
+                        break;
+                    }
+                    Frame::Data(df) => {
+                        match df.channel {
+                            DataFrame::CHANNEL_PAIRING => {
+                                println!(
+                                    "\n[Pairing] Incoming pairing ceremony request from '{}' ({})",
+                                    session.remote_name, session.remote_node_id
+                                );
+                                match session.execute_pairing(false, &InteractiveCliConfirm).await {
+                                    Ok(sas) => {
+                                        println!(
+                                            "\n[Pairing] SUCCESS! Device '{}' is now trusted (PIN: {}).\n",
+                                            session.remote_name, sas.formatted_pin
+                                        );
+                                        active_sessions
+                                            .lock()
+                                            .await
+                                            .insert(session.remote_node_id, outbound_tx.clone());
+                                    }
+                                    Err(e) => {
+                                        warn!("Pairing ceremony failed or was rejected: {e}");
+                                    }
+                                }
+                            }
+                            DataFrame::CHANNEL_CLIPBOARD => {
+                                if !session.state.is_trusted() {
+                                    warn!(
+                                        peer = %session.remote_name,
+                                        "BLOCKED: Rejected clipboard update from UNTRUSTED peer"
+                                    );
+                                } else if let Err(e) = clip_engine.handle_incoming_frame(&df) {
+                                    warn!(error = %e, "Failed to apply incoming clipboard frame");
+                                }
+                            }
+                            DataFrame::CHANNEL_FILE_TRANSFER => {
+                                if session.state.is_trusted() {
+                                    handle_file_transfer(&df.payload, &mut session.framed, &receive_dir, &session.remote_name).await?;
+                                } else {
+                                    warn!(
+                                        peer = %session.remote_name,
+                                        "BLOCKED: Rejected file transfer from UNTRUSTED peer"
+                                    );
+                                }
+                            }
+                            other => {
+                                debug!(channel = other, "Received data on unhandled channel");
+                            }
+                        }
+                    }
+                    Frame::Handshake(h) => {
+                        warn!(handshake = ?h, "Unexpected post-handshake message received");
+                    }
                 }
             }
-            Frame::Handshake(h) => {
-                warn!(handshake = ?h, "Unexpected post-handshake message received");
+
+            Some(outbound_df) = outbound_rx.recv() => {
+                if session.state.is_trusted() {
+                    let _ = session.framed.send_frame(&Frame::Data(outbound_df)).await;
+                }
             }
         }
     }
 
+    active_sessions.lock().await.remove(&session.remote_node_id);
     Ok(())
 }
 
-/// Manages incoming file transfer reception using the `bridge-transfer` engine.
-async fn handle_file_transfer(
+/// Handles incoming file transfer messages and coordinates chunk streaming.
+async fn handle_file_transfer<T: AsyncRead + AsyncWrite + Unpin>(
     payload: &[u8],
-    framed: &mut FramedStream<TcpStream>,
-    receive_dir: &PathBuf,
+    framed: &mut FramedStream<T>,
+    receive_dir: &std::path::Path,
     client_name: &str,
 ) -> Result<()> {
-    let msg: TransferMessage =
-        TransferMessage::from_bytes(payload).context("Failed to deserialize TransferMessage")?;
+    let msg = TransferMessage::from_bytes(payload)
+        .context("Failed to deserialize TransferMessage payload")?;
 
     match msg {
         TransferMessage::Offer(manifest) => {
@@ -321,19 +387,13 @@ async fn handle_file_transfer(
             let file_id = manifest.file_id.clone();
 
             println!(
-                "\n[File Transfer] Incoming offer from '{client_name}': '{file_name}' ({file_size} bytes, {total_chunks} chunks)"
+                "\n[Transfer] Incoming file offer from '{client_name}': '{file_name}' ({file_size} bytes, {total_chunks} chunks)"
             );
 
             let mut receiver = FileReceiver::to_dir(receive_dir, manifest.clone())
                 .await
-                .context("Failed to initialize FileReceiver")?;
-
+                .context("Failed to initialize file receiver")?;
             let start_chunk = receiver.next_expected_chunk();
-            if start_chunk > 0 {
-                println!("[File Transfer] Resuming from chunk {start_chunk}/{total_chunks}");
-            }
-
-            // Send Accept
             let accept = TransferMessage::Accept {
                 file_id: file_id.clone(),
                 start_chunk,
@@ -341,7 +401,9 @@ async fn handle_file_transfer(
             framed
                 .send_frame(&Frame::Data(accept.to_data_frame()?))
                 .await
-                .context("Failed to send TransferMessage::Accept")?;
+                .context("Failed to send Accept frame")?;
+
+            info!("Sent Accept frame to peer");
 
             // Receive file chunks
             loop {
@@ -416,8 +478,8 @@ async fn handle_file_transfer(
                 }
             }
         }
-        other => {
-            debug!("Ignoring non-offer transfer message: {other:?}");
+        _ => {
+            debug!("Processed intermediate file transfer message");
         }
     }
 

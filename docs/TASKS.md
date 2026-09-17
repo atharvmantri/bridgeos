@@ -186,5 +186,53 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 - **Dependencies:** BRG-CORE-001, BRG-IDN-001, BRG-PAIR-001, BRG-PROTO-001, BRG-TRANS-001
 - **Verification:** `cargo test -p bridge-clipboard`
 
+---
+
+### BRG-SESSION-001: Trusted Live Peer Session Orchestration & Pairing Integration
+- **Status:** DONE
+- **Subsystem:** session
+- **Goal:** Build a unified session orchestration layer (`bridge-session`) integrating mutual Ed25519 authentication, SQLite `TrustStore` validation, and interactive/programmatic SAS pairing into live peer connections.
+- **Acceptance Criteria:**
+  - `ActiveSession` state machine: `Handshaking` -> `AuthenticatedUntrusted` -> `Pairing` -> `Trusted` -> `Closed`.
+  - Rejection of key-substitution attacks (hard fail if a known `NodeId` presents a different public key than recorded in `TrustStore`).
+  - Gated application channels: untrusted peers cannot send/receive clipboard or file transfer data.
+  - Interactive/programmatic SAS pairing protocol over `CHANNEL_PAIRING` with `PairingConfirmation` callback.
+  - CLI commands in `bridge-cli`: `node --data-dir`, `pair --peer`, `trust list`, `trust revoke`, and `peers` with trust indicators.
+  - Comprehensive tests verifying handshake trust gating, key spoofing rejection, successful pairing transition, and revoked peer blocking.
+- **Relevant Files:** `Cargo.toml`, `crates/bridge-session/`, `tools/bridge-cli/`
+- **Dependencies:** BRG-CORE-001, BRG-IDN-001, BRG-PROTO-001, BRG-PAIR-001, BRG-TRANS-001
+- **Verification:** `cargo test -p bridge-session && cargo test -p bridge-cli`
+
+---
+
+### BRG-CLIP-002: Live Authenticated & Trusted Clipboard Session Integration
+- **Status:** DONE
+- **Subsystem:** continuity
+- **Goal:** Connect `ClipboardSyncEngine` into active trusted sessions with automatic broadcast to connected peers and incoming frame validation.
+- **Acceptance Criteria:**
+  - Outgoing local clipboard changes are automatically forwarded to all connected trusted peer sessions.
+  - Incoming clipboard frames on `CHANNEL_CLIPBOARD` are validated and applied to the local backend only if the peer is `Trusted`.
+  - Untrusted, revoked, or key-mismatched peers cannot inject clipboard content.
+  - Loopback suppression and sequence deduplication work across real network sockets.
+- **Relevant Files:** `crates/bridge-session/`, `tools/bridge-cli/src/node.rs`, `tools/bridge-cli/tests/cli_tests.rs`
+- **Dependencies:** BRG-SESSION-001, BRG-CLIP-001
+- **Verification:** `cargo test --workspace`
+
+---
+
+### BRG-WINCLIP-001: Native Windows Clipboard Backend
+- **Status:** TODO
+- **Subsystem:** continuity
+- **Goal:** Implement a real native Windows clipboard backend in `bridge-clipboard` (`WindowsClipboardBackend`) implementing `ClipboardBackend` using safe Win32 API interactions.
+- **Acceptance Criteria:**
+  - Reads and writes Unicode UTF-16 text to/from Windows clipboard (`CF_UNICODETEXT`).
+  - Gracefully handles clipboard locking/contention with exponential backoff retry.
+  - Event-driven clipboard change monitoring using Win32 clipboard listener hooks (`AddClipboardFormatListener`).
+  - Clean shutdown and background worker thread lifecycle.
+  - Connects to `bridge-cli node` when running on Windows.
+- **Relevant Files:** `crates/bridge-clipboard/Cargo.toml`, `crates/bridge-clipboard/src/backend/windows.rs`, `tools/bridge-cli/`
+- **Dependencies:** BRG-CLIP-001, BRG-SESSION-001, BRG-CLIP-002
+- **Verification:** `cargo test -p bridge-clipboard`
+
 
 

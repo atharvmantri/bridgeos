@@ -69,6 +69,10 @@ pub enum Commands {
         #[arg(short, long, default_value = "./received")]
         receive_dir: PathBuf,
 
+        /// Persistent node data directory (identity key and trust.db)
+        #[arg(long, default_value = "./data")]
+        data_dir: PathBuf,
+
         /// UDP broadcast beacon port
         #[arg(long, default_value_t = 42424)]
         broadcast_port: u16,
@@ -91,6 +95,21 @@ pub enum Commands {
         /// UDP broadcast beacon port
         #[arg(long, default_value_t = 42424)]
         broadcast_port: u16,
+    },
+
+    /// Discovers active LAN peers and cross-references their trust authorization status
+    Peers {
+        /// Discovery scan duration in seconds
+        #[arg(short, long, default_value_t = 3)]
+        duration: u64,
+
+        /// UDP broadcast beacon port
+        #[arg(long, default_value_t = 42424)]
+        broadcast_port: u16,
+
+        /// Persistent node data directory containing trust.db
+        #[arg(long, default_value = "./data")]
+        data_dir: PathBuf,
     },
 
     /// Pings an authenticated peer to measure round-trip latency
@@ -121,6 +140,35 @@ pub enum Commands {
         /// Sender device name
         #[arg(short, long, default_value = "BridgeOS-Sender")]
         name: String,
+
+        /// Persistent node data directory containing identity key
+        #[arg(long, default_value = "./data")]
+        data_dir: PathBuf,
+    },
+
+    /// Executes an explicit SAS pairing ceremony with a discovered peer
+    Pair {
+        /// Target peer address (IP:PORT)
+        #[arg(short, long)]
+        peer: SocketAddr,
+
+        /// Initiator device name
+        #[arg(short, long, default_value = "BridgeOS-PairClient")]
+        name: String,
+
+        /// Persistent node data directory containing identity and trust.db
+        #[arg(long, default_value = "./data")]
+        data_dir: PathBuf,
+    },
+
+    /// Manages the local persistent trust store
+    Trust {
+        #[command(subcommand)]
+        action: TrustAction,
+
+        /// Persistent node data directory containing trust.db
+        #[arg(long, default_value = "./data")]
+        data_dir: PathBuf,
     },
 
     /// Displays local Ed25519 node identity or generates a fresh keypair
@@ -128,6 +176,18 @@ pub enum Commands {
         /// Generate and output a fresh ephemeral identity key
         #[arg(short, long, default_value_t = false)]
         generate: bool,
+    },
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+pub enum TrustAction {
+    /// Lists all trusted peers recorded in the trust database
+    List,
+    /// Revokes trust for a specific hexadecimal NodeId
+    Revoke {
+        /// Hexadecimal NodeId to revoke
+        #[arg(short, long)]
+        node_id: String,
     },
 }
 
@@ -199,6 +259,7 @@ pub async fn execute_cli(cli: Cli) -> Result<()> {
             port,
             device_type,
             receive_dir,
+            data_dir,
             broadcast_port,
             no_mdns,
             no_udp,
@@ -209,6 +270,7 @@ pub async fn execute_cli(cli: Cli) -> Result<()> {
                 port,
                 device_type: dev_type,
                 receive_dir,
+                data_dir,
                 broadcast_port,
                 enable_mdns: !no_mdns,
                 enable_udp: !no_udp,
@@ -223,13 +285,47 @@ pub async fn execute_cli(cli: Cli) -> Result<()> {
             run_discover(duration, broadcast_port).await?;
         }
 
+        Commands::Peers {
+            duration,
+            broadcast_port,
+            data_dir,
+        } => {
+            client::run_peers(duration, broadcast_port, &data_dir).await?;
+        }
+
         Commands::Ping { peer, count, name } => {
             client::run_ping(peer, count, &name).await?;
         }
 
-        Commands::SendFile { peer, file, name } => {
-            client::run_send_file(peer, &file, &name).await?;
+        Commands::SendFile {
+            peer,
+            file,
+            name,
+            data_dir,
+        } => {
+            let key = bridge_identity::IdentityStorage::load_or_generate(
+                data_dir.join("identity").join("secret.key"),
+            )
+            .ok();
+            client::run_send_file(peer, &file, &name, key.as_ref()).await?;
         }
+
+        Commands::Pair {
+            peer,
+            name,
+            data_dir,
+        } => {
+            client::run_pair(peer, &name, &data_dir).await?;
+        }
+
+        Commands::Trust { action, data_dir } => match action {
+            TrustAction::List => {
+                client::run_trust_list(&data_dir)?;
+            }
+            TrustAction::Revoke { node_id } => {
+                client::run_trust_revoke(&data_dir, &node_id)?;
+            }
+        },
 
         Commands::Identity { generate } => {
             let _ = run_identity(generate)?;

@@ -49,19 +49,20 @@
 - Nothing. All 46 unit and integration tests pass with zero warnings under `cargo test` and `cargo clippy --all-targets -- -D warnings`.
 
 ### What Was Most Recently Completed?
-- **Cross-Device Clipboard Synchronization Engine (`BRG-CLIP-001`)**:
-  - Built `crates/bridge-clipboard` supporting text, HTML, and compressed image payloads with deterministic Blake3 content hashing.
-  - Implemented `EchoGuard` bounded ring-buffer deduplicator providing O(1) loopback suppression and monotonic sequence validation.
-  - Implemented `ClipboardPolicy` enforcing size limits, format restrictions, and sensitive credential protection.
-  - Implemented `ClipboardBackend` trait and `MemoryClipboardBackend` for testing and headless execution.
-  - Implemented `ClipboardSyncEngine` coordinating backend monitoring, wire packaging on `CHANNEL_CLIPBOARD`, and incoming frame verification.
-  - Added full test suite in `crates/bridge-clipboard/tests/clipboard_test.rs`.
-  - Documented ADR-0012 in `docs/DECISIONS.md`.
+- **Live Session Trust Gating, SAS Pairing & Clipboard Integration (`BRG-SESSION-001`, `BRG-CLIP-002`)**:
+  - Built `crates/bridge-session` with `ActiveSession` state machine (`Handshaking` $\to$ `AuthenticatedUntrusted` $\to$ `Pairing` $\to$ `Trusted` $\to$ `Terminated`).
+  - Wire protocol pairing framing on channel 5 (`CHANNEL_PAIRING`) with Blake3 HKDF symmetric SAS numeric PIN derivation and commitment verification.
+  - Interactive (`InteractiveCliConfirm`) and automated (`AutoConfirm`) pairing confirmation interfaces.
+  - Impersonation defense: known `NodeId` with an unexpected public key triggers instant session abort (`SessionError::KeyMismatch`).
+  - Application channel gating: unauthenticated or untrusted peers are hard-blocked from injecting clipboard updates (`CHANNEL_CLIPBOARD`) or files (`CHANNEL_FILE_TRANSFER`).
+  - Wired `ClipboardSyncEngine` into `bridge-cli node` with automatic outbound broadcasting to active trusted peers and inbound loopback suppression.
+  - Added CLI commands to `tools/bridge-cli`: `node --data-dir`, `pair --peer`, `trust list`, `trust revoke`, and `peers`.
+  - Documented ADR-0013 in `docs/DECISIONS.md`.
 
 ### Major Known Issues
 - None.
 
 ### What Should The Next Agent Do?
-1. Integrate `bridge-clipboard` and `TrustStore` into `bridge-cli` node session handling for live terminal-to-terminal clipboard sync.
+1. Implement Native Windows Clipboard Backend (`BRG-WINCLIP-001`) with Win32 format listeners and Unicode UTF-16 text sync.
 2. Implement cross-device Notification Mirroring protocol and engine (`bridge-notifications`).
 3. Implement Standalone Relay daemon service (`services/relay`).

@@ -100,3 +100,18 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Documented architectural decision ADR-0012 in `docs/DECISIONS.md`.
   - Updated `docs/STATE.md` and `docs/TASKS.md`.
 
+---
+
+### 2026-09-17: Live Session Trust Gating, SAS Pairing & Clipboard Integration (BRG-SESSION-001, BRG-CLIP-002)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Designed and implemented `crates/bridge-session` crate providing reusable `ActiveSession` state machine (`Handshaking` $\to$ `AuthenticatedUntrusted` $\to$ `Pairing` $\to$ `Trusted` $\to$ `Terminated`).
+  - Wire protocol pairing framing on channel 5 (`CHANNEL_PAIRING`) with symmetric 6-digit SAS PIN derivation and mutual cryptographic commitment verification.
+  - Implemented `PairingConfirmation` trait supporting interactive terminal prompts (`InteractiveCliConfirm`) and test fixtures (`AutoConfirm`).
+  - Implemented strict impersonation defense: instantly terminates sessions upon detecting known `NodeId` presenting an unexpected public key (`SessionError::KeyMismatch`).
+  - Enforced channel-level application gating: clipboard (channel 1) and file transfer (channel 2) frames are hard-blocked for untrusted peers.
+  - Connected `ClipboardSyncEngine` into `tools/bridge-cli` node loop with background outbound broadcasting and incoming application on trusted sessions.
+  - Added CLI subcommands: `node --data-dir`, `pair --peer`, `trust list`, `trust revoke`, and `peers` with trust indicators.
+  - Added session integration test suite (`crates/bridge-session/tests/session_test.rs`) and CLI security tests (`tools/bridge-cli/tests/cli_tests.rs`).
+  - Documented architectural decision ADR-0013 in `docs/DECISIONS.md`.
+  - Updated `docs/STATE.md` and `docs/TASKS.md`.

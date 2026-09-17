@@ -1,35 +1,27 @@
 [package]
-name = "bridge-cli"
+name = "bridge-session"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
-[lib]
-name = "bridge_cli"
-path = "src/lib.rs"
-
-[[bin]]
-name = "bridge-cli"
-path = "src/main.rs"
-
 [dependencies]
 bridge-core = { workspace = true }
-bridge-identity = { workspace = true }
 bridge-protocol = { workspace = true }
-bridge-discovery = { workspace = true }
+bridge-identity = { workspace = true }
 bridge-transport = { workspace = true }
 bridge-transfer = { workspace = true }
 bridge-clipboard = { workspace = true }
-bridge-session = { workspace = true }
 tokio = { workspace = true }
-clap = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-anyhow = { workspace = true }
-hex = { workspace = true }
-rand = { workspace = true }
+serde = { workspace = true }
 postcard = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.17"
 
 [lints]
 workspace = true

@@ -4,7 +4,7 @@ use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 
 /// Cryptographic device identity keypair backed by Ed25519.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IdentityKey {
     signing_key: SigningKey,
 }

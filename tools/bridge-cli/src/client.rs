@@ -1,14 +1,16 @@
 use anyhow::{bail, Context, Result};
-use bridge_core::{Capabilities, ProtocolVersion};
-use bridge_identity::IdentityKey;
+use bridge_core::{Capabilities, DeviceType, NodeId, ProtocolVersion};
+use bridge_identity::{IdentityKey, IdentityStorage, TrustStore};
 use bridge_protocol::{
     AuthResponse, AuthResult, ClientHello, ControlFrame, DisconnectReason, Frame, HandshakeFrame,
     ServerHello,
 };
+use bridge_session::{ActiveSession, InteractiveCliConfirm};
 use bridge_transfer::{create_manifest_from_file, FileSender, TransferMessage};
 use bridge_transport::FramedStream;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::net::TcpStream;
 use tracing::{debug, info};
@@ -178,6 +180,7 @@ pub async fn run_send_file(
     peer_addr: SocketAddr,
     file_path: &Path,
     device_name: &str,
+    client_key: Option<&IdentityKey>,
 ) -> Result<()> {
     if !file_path.exists() {
         bail!("File not found: {}", file_path.display());
@@ -199,9 +202,15 @@ pub async fn run_send_file(
         hex::encode(manifest.blake3_root_hash)
     );
 
-    let client_key = IdentityKey::generate();
+    let generated_key;
+    let effective_key = if let Some(k) = client_key {
+        k
+    } else {
+        generated_key = IdentityKey::generate();
+        &generated_key
+    };
     let (mut framed, server_hello) =
-        connect_and_handshake(peer_addr, &client_key, device_name).await?;
+        connect_and_handshake(peer_addr, effective_key, device_name).await?;
 
     println!(
         "Connected to peer '{}' ({}). Offering file transfer...",
@@ -359,5 +368,178 @@ pub async fn run_send_file(
         }))
         .await;
 
+    Ok(())
+}
+
+/// Executes an explicit SAS pairing ceremony with a remote peer node.
+pub async fn run_pair(peer_addr: SocketAddr, device_name: &str, data_dir: &Path) -> Result<()> {
+    tokio::fs::create_dir_all(data_dir).await?;
+    let key_path = data_dir.join("identity").join("secret.key");
+    let key = Arc::new(IdentityStorage::load_or_generate(&key_path)?);
+    let trust_store = Arc::new(TrustStore::open(data_dir.join("trust.db"))?);
+
+    println!("Connecting to {peer_addr} to initiate pairing ceremony...");
+    let socket = TcpStream::connect(peer_addr)
+        .await
+        .with_context(|| format!("Failed to connect to {peer_addr}"))?;
+
+    let mut session = ActiveSession::client_handshake(
+        socket,
+        key,
+        device_name.to_string(),
+        DeviceType::Windows,
+        trust_store,
+        None,
+        None,
+    )
+    .await
+    .context("Cryptographic authentication handshake failed")?;
+
+    println!(
+        "Authenticated with '{}' ({}). Negotiating SAS verification PIN...",
+        session.remote_name, session.remote_node_id
+    );
+
+    let sas = session
+        .execute_pairing(true, &InteractiveCliConfirm)
+        .await
+        .context("Pairing ceremony failed or was rejected")?;
+
+    println!("\n========================================================");
+    println!("  PAIRING SUCCESSFUL!");
+    println!("--------------------------------------------------------");
+    println!("  Device Name:       {}", session.remote_name);
+    println!("  Node ID:           {}", session.remote_node_id);
+    println!(
+        "  Verified SAS PIN:  \x1b[1;32m{}\x1b[0m",
+        sas.formatted_pin
+    );
+    println!(
+        "  Trust Record:      {}",
+        data_dir.join("trust.db").display()
+    );
+    println!("========================================================\n");
+
+    Ok(())
+}
+
+/// Lists all trusted peers recorded in the local trust store.
+pub fn run_trust_list(data_dir: &Path) -> Result<()> {
+    let trust_path = data_dir.join("trust.db");
+    if !trust_path.exists() {
+        println!("No trust database found at {}", trust_path.display());
+        return Ok(());
+    }
+
+    let trust_store = TrustStore::open(&trust_path)?;
+    let peers = trust_store.list_peers()?;
+
+    if peers.is_empty() {
+        println!("No trusted peers recorded in {}", trust_path.display());
+    } else {
+        println!(
+            "\nTrusted Devices ({}) in {}:",
+            peers.len(),
+            trust_path.display()
+        );
+        println!("{:-<75}", "");
+        for (i, p) in peers.iter().enumerate() {
+            println!(
+                "[{}] '{}' ({:?}) - Trust State: {:?}",
+                i + 1,
+                p.device_name,
+                p.device_type,
+                p.trust_state
+            );
+            println!("    Node ID:      {}", p.node_id);
+            println!("    Public Key:   {}", hex::encode(p.public_key.to_bytes()));
+            println!("    First Paired: unix:{}", p.first_paired_at);
+            println!("    Last Seen:    unix:{}", p.last_seen_at);
+        }
+        println!("{:-<75}\n", "");
+    }
+
+    Ok(())
+}
+
+/// Revokes trust for a specific peer NodeId in the local trust store.
+pub fn run_trust_revoke(data_dir: &Path, node_id_hex: &str) -> Result<()> {
+    let trust_path = data_dir.join("trust.db");
+    let trust_store = TrustStore::open(&trust_path)?;
+    let node_id = NodeId::from_hex(node_id_hex)
+        .with_context(|| format!("Invalid hexadecimal NodeId '{node_id_hex}'"))?;
+
+    trust_store.revoke_peer(&node_id)?;
+    println!("Successfully revoked trust for peer {node_id}");
+    Ok(())
+}
+
+/// Discovers peers on LAN and displays their trust authorization status.
+pub async fn run_peers(duration_secs: u64, broadcast_port: u16, data_dir: &Path) -> Result<()> {
+    use bridge_discovery::{
+        DiscoveryConfig, UdpConfig, UnifiedDiscovery, UnifiedDiscoveryConfig, UnifiedDiscoveryMode,
+    };
+
+    let trust_path = data_dir.join("trust.db");
+    let trust_store = if trust_path.exists() {
+        Some(TrustStore::open(&trust_path)?)
+    } else {
+        None
+    };
+
+    println!("Scanning local LAN for BridgeOS peers for {duration_secs} seconds...",);
+
+    let udp_cfg = UdpConfig {
+        broadcast_port,
+        bind_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), broadcast_port),
+        broadcast_targets: vec![SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::BROADCAST),
+            broadcast_port,
+        )],
+        ..Default::default()
+    };
+
+    let unified_cfg = UnifiedDiscoveryConfig {
+        mode: UnifiedDiscoveryMode::Both,
+        mdns: DiscoveryConfig::default(),
+        udp: udp_cfg,
+    };
+
+    let mut discovery = UnifiedDiscovery::new(unified_cfg)?;
+    discovery.start_discovery()?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(duration_secs)).await;
+
+    let peers = discovery.directory().list();
+    if peers.is_empty() {
+        println!("No BridgeOS peers discovered on the local network.");
+    } else {
+        println!("\nFound {} BridgeOS peer(s):", peers.len());
+        for (i, peer) in peers.iter().enumerate() {
+            let trust_status = if let Some(ref ts) = trust_store {
+                match ts.get_peer(&peer.node_id) {
+                    Ok(Some(p)) => format!("[{:?}]", p.trust_state),
+                    Ok(None) => "[UNTRUSTED / UNPAIRED]".to_string(),
+                    Err(_) => "[UNKNOWN]".to_string(),
+                }
+            } else {
+                "[UNTRUSTED / NO TRUST DB]".to_string()
+            };
+
+            println!(
+                "\n[{}] Name:         {}  \x1b[1;33m{}\x1b[0m",
+                i + 1,
+                peer.device_name,
+                trust_status
+            );
+            println!("    Node ID:      {}", peer.node_id);
+            println!("    Type:         {:?}", peer.device_type);
+            println!("    Addresses:    {:?}", peer.addresses);
+            println!("    Capabilities: {:?}", peer.capabilities);
+        }
+        println!();
+    }
+
+    discovery.shutdown().await?;
     Ok(())
 }

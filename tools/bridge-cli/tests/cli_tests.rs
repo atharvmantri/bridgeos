@@ -1,12 +1,16 @@
 use bridge_cli::client::{connect_and_handshake, run_ping, run_send_file};
 use bridge_cli::node::handle_connection;
 use bridge_cli::{run_identity, Cli, Commands};
-use bridge_identity::IdentityKey;
+use bridge_clipboard::backend::MemoryClipboardBackend;
+use bridge_clipboard::ClipboardSyncEngine;
+use bridge_identity::{IdentityKey, TrustStore, TrustedPeer};
 use clap::Parser;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 
 #[test]
 fn test_cli_parsing_node() {
@@ -35,6 +39,7 @@ fn test_cli_parsing_node() {
             broadcast_port,
             no_mdns,
             no_udp,
+            data_dir: _,
         } => {
             assert_eq!(name, "desktop-a");
             assert_eq!(port, 9801);
@@ -87,7 +92,12 @@ fn test_cli_parsing_send_file() {
 
     let cli = Cli::try_parse_from(args).expect("Failed to parse send-file command");
     match cli.command {
-        Commands::SendFile { peer, file, name } => {
+        Commands::SendFile {
+            peer,
+            file,
+            name,
+            data_dir: _,
+        } => {
             assert_eq!(peer, "127.0.0.1:9801".parse::<SocketAddr>().unwrap());
             assert_eq!(file, PathBuf::from("./test.txt"));
             assert_eq!(name, "sender-bot");
@@ -135,6 +145,14 @@ fn test_cli_parsing_identity() {
     assert_eq!(key.public_key().to_bytes().len(), 32);
 }
 
+fn test_clip_engine(node_id: bridge_core::NodeId) -> Arc<ClipboardSyncEngine> {
+    Arc::new(ClipboardSyncEngine::new(
+        node_id,
+        Arc::new(MemoryClipboardBackend::new()),
+        bridge_clipboard::ClipboardPolicy::default(),
+    ))
+}
+
 #[tokio::test]
 async fn test_node_harness_ping_roundtrip() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -145,6 +163,9 @@ async fn test_node_harness_ping_roundtrip() {
     tokio::fs::create_dir_all(&temp_dir).await.unwrap();
     let receive_dir = Arc::new(temp_dir.clone());
     let server_name = Arc::new("server-node".to_string());
+    let trust_store = Arc::new(TrustStore::open(temp_dir.join("trust.db")).unwrap());
+    let clip_engine = test_clip_engine(server_identity.node_id());
+    let active_sessions = Arc::new(Mutex::new(HashMap::new()));
 
     let server_task = tokio::spawn(async move {
         let (socket, remote_addr) = listener.accept().await.unwrap();
@@ -154,6 +175,9 @@ async fn test_node_harness_ping_roundtrip() {
             server_identity,
             receive_dir,
             server_name,
+            trust_store,
+            clip_engine,
+            active_sessions,
         )
         .await
     });
@@ -183,6 +207,22 @@ async fn test_node_harness_send_file_roundtrip() {
     tokio::fs::create_dir_all(&temp_recv).await.unwrap();
     let receive_dir = Arc::new(temp_recv.clone());
     let server_name = Arc::new("server-node".to_string());
+    let trust_store = Arc::new(TrustStore::open(temp_recv.join("trust.db")).unwrap());
+    let clip_engine = test_clip_engine(server_identity.node_id());
+    let active_sessions = Arc::new(Mutex::new(HashMap::new()));
+
+    // Create client identity and register it as trusted peer on server
+    let client_identity = IdentityKey::generate();
+    let trusted_peer = TrustedPeer {
+        node_id: client_identity.node_id(),
+        public_key: client_identity.public_key(),
+        device_name: "client-sender".to_string(),
+        device_type: bridge_core::DeviceType::Windows,
+        first_paired_at: 100,
+        last_seen_at: 100,
+        trust_state: bridge_identity::TrustState::Trusted,
+    };
+    trust_store.save_peer(&trusted_peer).unwrap();
 
     // Create a 150KB source file (spans 3 chunks of 64KB)
     let temp_src = std::env::temp_dir().join(format!("bridge_cli_src_{}", rand::random::<u64>()));
@@ -199,11 +239,14 @@ async fn test_node_harness_send_file_roundtrip() {
             server_identity,
             receive_dir,
             server_name,
+            trust_store,
+            clip_engine,
+            active_sessions,
         )
         .await
     });
 
-    let client_res = run_send_file(addr, &src_file, "client-sender").await;
+    let client_res = run_send_file(addr, &src_file, "client-sender", Some(&client_identity)).await;
     assert!(
         client_res.is_ok(),
         "Client send-file should succeed: {client_res:?}"
@@ -239,6 +282,9 @@ async fn test_node_handshake_authentication_negotiation() {
     tokio::fs::create_dir_all(&temp_dir).await.unwrap();
     let receive_dir = Arc::new(temp_dir.clone());
     let server_name = Arc::new("server-node".to_string());
+    let trust_store = Arc::new(TrustStore::open(temp_dir.join("trust.db")).unwrap());
+    let clip_engine = test_clip_engine(server_identity.node_id());
+    let active_sessions = Arc::new(Mutex::new(HashMap::new()));
 
     let server_task = tokio::spawn(async move {
         let (socket, remote_addr) = listener.accept().await.unwrap();
@@ -248,6 +294,9 @@ async fn test_node_handshake_authentication_negotiation() {
             server_identity,
             receive_dir,
             server_name,
+            trust_store,
+            clip_engine,
+            active_sessions,
         )
         .await
     });
@@ -286,6 +335,9 @@ async fn test_node_handshake_invalid_signature_rejection() {
     tokio::fs::create_dir_all(&temp_dir).await.unwrap();
     let receive_dir = Arc::new(temp_dir.clone());
     let server_name = Arc::new("server-node".to_string());
+    let trust_store = Arc::new(TrustStore::open(temp_dir.join("trust.db")).unwrap());
+    let clip_engine = test_clip_engine(server_identity.node_id());
+    let active_sessions = Arc::new(Mutex::new(HashMap::new()));
 
     let server_task = tokio::spawn(async move {
         let (socket, remote_addr) = listener.accept().await.unwrap();
@@ -295,6 +347,9 @@ async fn test_node_handshake_invalid_signature_rejection() {
             server_identity,
             receive_dir,
             server_name,
+            trust_store,
+            clip_engine,
+            active_sessions,
         )
         .await
     });
@@ -352,4 +407,69 @@ async fn test_node_handshake_invalid_signature_rejection() {
 
     let _ = server_task.await;
     let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+}
+
+#[tokio::test]
+async fn test_untrusted_peer_file_transfer_blocked() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server_identity = Arc::new(IdentityKey::generate());
+    let temp_recv =
+        std::env::temp_dir().join(format!("bridge_cli_blocked_{}", rand::random::<u64>()));
+    tokio::fs::create_dir_all(&temp_recv).await.unwrap();
+    let receive_dir = Arc::new(temp_recv.clone());
+    let server_name = Arc::new("server-node".to_string());
+    let trust_store = Arc::new(TrustStore::open(temp_recv.join("trust.db")).unwrap());
+    let clip_engine = test_clip_engine(server_identity.node_id());
+    let active_sessions = Arc::new(Mutex::new(HashMap::new()));
+
+    // Notice: Client is NOT registered in trust_store! Peer is untrusted.
+
+    let temp_src =
+        std::env::temp_dir().join(format!("bridge_cli_src_blocked_{}", rand::random::<u64>()));
+    tokio::fs::create_dir_all(&temp_src).await.unwrap();
+    let src_file = temp_src.join("blocked_payload.bin");
+    tokio::fs::write(&src_file, b"untrusted secret payload")
+        .await
+        .unwrap();
+
+    let _server_task = tokio::spawn(async move {
+        let (socket, remote_addr) = listener.accept().await.unwrap();
+        let _ = handle_connection(
+            socket,
+            remote_addr,
+            server_identity,
+            receive_dir,
+            server_name,
+            trust_store,
+            clip_engine,
+            active_sessions,
+        )
+        .await;
+    });
+
+    // Attempting to send a file from an untrusted client must fail / time out waiting for Accept
+    let res = tokio::time::timeout(
+        std::time::Duration::from_millis(1500),
+        run_send_file(addr, &src_file, "untrusted-sender", None),
+    )
+    .await;
+
+    // Either the timeout expires waiting for Accept (because server blocked/dropped the offer)
+    // or run_send_file returns an Err.
+    match res {
+        Err(_) => {
+            // Timed out because server safely blocked/ignored the transfer offer
+        }
+        Ok(send_res) => {
+            assert!(
+                send_res.is_err(),
+                "Untrusted peer must NOT succeed in transferring a file: {send_res:?}"
+            );
+        }
+    }
+
+    let _ = tokio::fs::remove_dir_all(&temp_src).await;
+    let _ = tokio::fs::remove_dir_all(&temp_recv).await;
 }
