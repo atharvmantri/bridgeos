@@ -22,9 +22,9 @@ This document outlines the phased development roadmap for BridgeOS from foundati
 
 ## Milestone 2: Pairing & Cryptographic Trust Store
 **Objective:** Cryptographic mutual authentication and pairing ceremony.
-- [ ] Ed25519 keypair generation and secure on-disk identity persistence.
-- [ ] Short Authentication String (SAS) numeric PIN / QR verification ceremony.
-- [ ] SQLite-backed trusted device whitelist and permissions store.
+- [x] Ed25519 keypair generation and secure on-disk identity persistence.
+- [x] Short Authentication String (SAS) numeric PIN / QR verification ceremony.
+- [x] SQLite-backed trusted device whitelist and permissions store.
 
 ## Milestone 3: Bi-directional Clipboard Synchronization
 **Objective:** Real-time synchronization of text and images across paired devices.
@@ -34,8 +34,8 @@ This document outlines the phased development roadmap for BridgeOS from foundati
 
 ## Milestone 4: Resumable Streaming File Transfer Engine
 **Objective:** High-performance, fault-tolerant file streaming.
-- [ ] Chunked file streaming with Blake3 hash trees (`bridge-transfer`).
-- [ ] Interrupted transfer resumption and progress reporting.
+- [x] Chunked file streaming with Blake3 hash trees (`bridge-transfer`).
+- [x] Interrupted transfer resumption and progress reporting.
 - [ ] Transfer approval prompts and rate limiting.
 
 ## Milestone 5: Windows Desktop Application

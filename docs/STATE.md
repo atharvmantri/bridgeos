@@ -22,37 +22,46 @@
   - UDP broadcast beaconing (`BRGB` magic prefix, versioned Postcard envelopes) with immediate `Query` probe elicitation, periodic heartbeat beaconing, and explicit `Goodbye` departure.
   - Multi-channel `UnifiedDiscovery` coordinating concurrent mDNS and UDP beacon fallback over a shared `PeerDirectory` with address deduplication and TTL expiration pruning.
 - **Resumable Chunked Streaming Transfer (`bridge-transfer`):** 64KB chunk streaming (`FileSender`), disk/memory chunk ingestion & verification (`FileReceiver`), per-chunk Blake3 checksums, whole-file root hash validation, automatic `.part` file truncation to verified chunk boundary upon resumption, and protocol wire framing (`TransferMessage` on `CHANNEL_FILE_TRANSFER`).
+- **Cross-Device Clipboard Synchronization (`bridge-clipboard`):**
+  - Bidirectional text, rich text HTML, and image synchronization (`ClipboardContent`, `ClipboardEntry`).
+  - Strict O(1) loopback echo suppression (`EchoGuard`) preventing ping-pong oscillations when local clipboard updates are applied.
+  - Monotonic sequence tracking per origin node preventing out-of-order or duplicate message injection.
+  - Bounded size budgeting (2MB text, 10MB images) and sensitive password/credential filtering (`ClipboardPolicy`).
+  - Pluggable platform clipboard backend abstraction (`ClipboardBackend`) with thread-safe `MemoryClipboardBackend`.
+  - Wire protocol integration over `DataFrame` channel 1 (`DataFrame::CHANNEL_CLIPBOARD`).
 - **Developer Multi-Node CLI Harness (`tools/bridge-cli`)**:
   - Interactive terminal executable `bridge-cli` with subcommands: `node`, `discover`, `ping`, `send-file`, `identity`.
   - Enables launching and manually testing multiple BridgeOS nodes across terminals on localhost or local LAN.
   - Full end-to-end integration of `bridge-core`, `bridge-identity`, `bridge-protocol`, `bridge-discovery`, `bridge-transport`, and `bridge-transfer`.
-- **Integration Test Suite (`tests/integration`, `tools/bridge-cli/tests`, `crates/bridge-identity/tests`):**
+- **Integration Test Suite (`tests/integration`, `tools/bridge-cli/tests`, `crates/bridge-identity/tests`, `crates/bridge-clipboard/tests`):**
   - Milestone 0: Local in-memory and TCP socket mutual Ed25519 authentication, capability negotiation, and framed data transfer.
   - Milestone 1: Multi-node live mDNS discovery AND UDP broadcast beacon discovery, dynamic socket resolution, automated TCP connection establishment, and authenticated session negotiation.
   - Milestone 2: Multi-node TCP file streaming, whole-file root hash validation, and interrupted session resumption from last verified chunk offset.
   - Milestone 2 Trust: In-memory and SQLite disk persistence, public key consistency enforcement, impersonation attack rejection, peer revocation, and symmetric SAS pairing finalization.
+  - Milestone 3 Clipboard: Payload hashing, wire encoding/decoding, bounded ring-buffer deduplication, loopback echo suppression, sequence tracking, policy enforcement, and image synchronization.
   - CLI Harness: Command-line parsing, node lifecycle, authenticated ping/pong roundtrips, multi-chunk file transfer, and cryptographic signature rejection.
 - **Continuous Integration (`.github/workflows/ci.yml`):** Ubuntu and Windows matrix testing with strict clippy and formatting checks.
 
 ### What Is Partially Implemented?
-- None in current milestones (M0, M1, M2 transfer & pairing core, and CLI harness are fully implemented and verified).
+- None in current milestones (M0, M1, M2 transfer & pairing, and M3 clipboard sync core are fully implemented and verified).
 
 ### What Is Broken?
-- Nothing. All 40 unit and integration tests pass with zero warnings under `cargo test` and `cargo clippy --all-targets -- -D warnings`.
+- Nothing. All 46 unit and integration tests pass with zero warnings under `cargo test` and `cargo clippy --all-targets -- -D warnings`.
 
 ### What Was Most Recently Completed?
-- **Explicit Secure Pairing & Persistent Trust Store (`BRG-PAIR-001`)**:
-  - Implemented SQLite-backed `TrustStore` with schema migration, WAL mode, transactional peer CRUD, and revocation states (`trust.rs`).
-  - Implemented cryptographic impersonation detection in `is_trusted` preventing key substitution attacks against known `NodeId`s.
-  - Built `PairingSession` state machine with symmetric 6-digit numeric SAS PIN derivation and signed commitment confirmation (`pairing.rs`).
-  - Implemented secure local identity private key disk persistence (`IdentityStorage`) isolated from public trust database (`storage.rs`).
-  - Implemented comprehensive test suite in `crates/bridge-identity/tests/pairing_and_trust_test.rs`.
-  - Documented ADR-0011 in `docs/DECISIONS.md`.
+- **Cross-Device Clipboard Synchronization Engine (`BRG-CLIP-001`)**:
+  - Built `crates/bridge-clipboard` supporting text, HTML, and compressed image payloads with deterministic Blake3 content hashing.
+  - Implemented `EchoGuard` bounded ring-buffer deduplicator providing O(1) loopback suppression and monotonic sequence validation.
+  - Implemented `ClipboardPolicy` enforcing size limits, format restrictions, and sensitive credential protection.
+  - Implemented `ClipboardBackend` trait and `MemoryClipboardBackend` for testing and headless execution.
+  - Implemented `ClipboardSyncEngine` coordinating backend monitoring, wire packaging on `CHANNEL_CLIPBOARD`, and incoming frame verification.
+  - Added full test suite in `crates/bridge-clipboard/tests/clipboard_test.rs`.
+  - Documented ADR-0012 in `docs/DECISIONS.md`.
 
 ### Major Known Issues
 - None.
 
 ### What Should The Next Agent Do?
-1. Begin Milestone 3: Cross-device clipboard synchronization engine (`BRG-CLIP-001`: `bridge-clipboard`).
-2. Integrate `TrustStore` verification directly into `bridge-cli` connection listener and client handshake.
+1. Integrate `bridge-clipboard` and `TrustStore` into `bridge-cli` node session handling for live terminal-to-terminal clipboard sync.
+2. Implement cross-device Notification Mirroring protocol and engine (`bridge-notifications`).
 3. Implement Standalone Relay daemon service (`services/relay`).

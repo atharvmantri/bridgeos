@@ -85,5 +85,18 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Built zero-trust LAN validation with strict public-key consistency enforcement (`TrustStore::is_trusted`), detecting and rejecting key-substitution / node impersonation attempts with `IdentityError::KeyMismatch`.
   - Implemented `IdentityStorage` providing isolated local secret key file persistence with restricted filesystem permissions (0600 on Unix) isolated from public trust database.
   - Added comprehensive test suite (`crates/bridge-identity/tests/pairing_and_trust_test.rs`) verifying SQLite CRUD, disk restart persistence, symmetric SAS code matching, mutual signature confirmation, user rejection, impersonation defense, and local secret key security.
-  - Documented architectural decision ADR-0011 in `docs/DECISIONS.md`.
+---
+
+### 2026-09-17: Cross-Device Clipboard Synchronization Engine (BRG-CLIP-001)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Designed and built `crates/bridge-clipboard` supporting bidirectional text, rich HTML, and image synchronization over protocol multiplex channel 1 (`DataFrame::CHANNEL_CLIPBOARD`).
+  - Implemented `EchoGuard` bounded ring-buffer loopback suppressor preventing ping-pong echo storms when local system monitors detect updates applied from remote peers.
+  - Implemented origin sequence number tracking ensuring monotonically increasing freshness per peer.
+  - Formulated `ClipboardPolicy` enforcing configurable size budgets (2MB text, 10MB images) and sensitive password manager copy blocking.
+  - Created `ClipboardBackend` trait and thread-safe `MemoryClipboardBackend` with change notifications for tests and headless environments.
+  - Built `ClipboardSyncEngine` managing local monitor dispatch, wire framing, payload verification, and remote update ingestion.
+  - Added unit and integration test suite (`crates/bridge-clipboard/tests/clipboard_test.rs`) verifying hash integrity, bounded capacity pruning, policy checks, end-to-end bidirectional sync, loopback echo suppression, and image payload transport.
+  - Documented architectural decision ADR-0012 in `docs/DECISIONS.md`.
   - Updated `docs/STATE.md` and `docs/TASKS.md`.
+

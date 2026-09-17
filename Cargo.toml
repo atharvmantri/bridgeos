@@ -6,6 +6,7 @@ members = [
     "crates/bridge-discovery",
     "crates/bridge-transport",
     "crates/bridge-transfer",
+    "crates/bridge-clipboard",
     "tools/bridge-cli",
     "tests/integration",
 ]
@@ -26,6 +27,7 @@ bridge-identity = { path = "crates/bridge-identity" }
 bridge-discovery = { path = "crates/bridge-discovery" }
 bridge-transport = { path = "crates/bridge-transport" }
 bridge-transfer = { path = "crates/bridge-transfer" }
+bridge-clipboard = { path = "crates/bridge-clipboard" }
 
 # Async & Networking
 tokio = { version = "1.43", features = ["full"] }

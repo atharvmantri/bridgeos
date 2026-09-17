@@ -172,7 +172,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-CLIP-001: Cross-Device Clipboard Synchronization Engine
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** continuity
 - **Goal:** Build the bidirectional clipboard synchronization engine (`bridge-clipboard`) for text and image payloads, with encryption, size budgeting, loopback echo suppression, and deduplication.
 - **Acceptance Criteria:**
@@ -182,7 +182,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
   - OS clipboard integration abstraction / traits for platform adapters (Windows Win32, Android Jetpack).
   - Integration with `bridge_protocol::DataFrame` over `CHANNEL_CLIPBOARD`.
   - Comprehensive unit and integration tests verifying deduplication, payload framing, and echo avoidance.
-- **Relevant Files:** `Cargo.toml`, `crates/bridge-clipboard/Cargo.toml`, `crates/bridge-clipboard/src/lib.rs`
+- **Relevant Files:** `Cargo.toml`, `crates/bridge-clipboard/Cargo.toml`, `crates/bridge-clipboard/src/lib.rs`, `crates/bridge-clipboard/src/types.rs`, `crates/bridge-clipboard/src/guard.rs`, `crates/bridge-clipboard/src/policy.rs`, `crates/bridge-clipboard/src/backend.rs`, `crates/bridge-clipboard/src/engine.rs`, `crates/bridge-clipboard/tests/clipboard_test.rs`
 - **Dependencies:** BRG-CORE-001, BRG-IDN-001, BRG-PAIR-001, BRG-PROTO-001, BRG-TRANS-001
 - **Verification:** `cargo test -p bridge-clipboard`
 
