@@ -82,4 +82,14 @@ This document records significant architectural and engineering decisions. Settl
 - **Alternatives Considered:** Streaming raw file streams without chunk checksums (rejected: requires whole-file retransfer if corruption occurs); SHA-256 chunking (rejected: Blake3 provides significantly higher throughput on both modern desktop CPUs and mobile devices).
 - **Consequences:** File manifests must calculate whole-file Blake3 hashes before transfer; receivers track chunk sets and write verified chunks into temporary `.part` files.
 
+---
+
+## ADR-0009: UDP Broadcast Beacon Fallback & Unified Multi-Channel Discovery
+- **Date:** 2026-09-17
+- **Status:** Accepted
+- **Decision:** Implement a bounded UDP broadcast beacon fallback mechanism using magic header `BRGB`, version 1 byte, and Postcard-serialized `BeaconMessage` payloads (`Announcement`, `Goodbye`, `Query`). Provide a `UnifiedDiscovery` abstraction that manages concurrent mDNS and UDP discovery channels over a shared, thread-safe `PeerDirectory`.
+- **Reasoning:** In certain LANs, enterprise environments, or restrictive Wi-Fi access points, multicast DNS (UDP port 5353) is filtered or disabled. UDP broadcast (default port 42424) operates reliably on local subnets without multicast routing dependencies. Bounding datagrams to 1400 bytes prevents IP fragmentation. The immediate `Query` probe eliminates latency on network entry, while `Goodbye` avoids lingering stale entries.
+- **Alternatives Considered:** UDP broadcast-only (rejected: mDNS is the cross-platform zero-config standard for macOS/iOS and zero-permission LAN environments); raw ICMP ping scans (rejected: unprivileged sockets cannot issue raw ICMP on Windows and Android).
+- **Consequences:** Nodes can now discover each other across both mDNS-enabled and mDNS-restricted subnets; `PeerDirectory` merges and deduplicates multi-homed addresses discovered via different channels.
+
 

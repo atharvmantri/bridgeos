@@ -12,6 +12,12 @@ pub enum DiscoveryError {
     #[error("Invalid node identifier: {0}")]
     InvalidNodeId(String),
 
+    #[error("Invalid discovery packet: {0}")]
+    InvalidPacket(String),
+
+    #[error("Network I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
     #[error("Internal discovery error: {0}")]
     Internal(String),
 

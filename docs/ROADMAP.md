@@ -13,11 +13,12 @@ This document outlines the phased development roadmap for BridgeOS from foundati
 - [x] Async transport layer and length-delimited framed stream (`bridge-transport`).
 - [x] Integration test harness verifying two local nodes handshaking and exchanging messages.
 
-## Milestone 1: LAN Discovery & Peer Directory
+## Milestone 1: LAN Discovery & Peer Directory (COMPLETED)
 **Objective:** Devices discover each other on the local network without manual IP entry.
-- [ ] mDNS / DNS-SD service broadcasting and discovery (`bridge-discovery`).
-- [ ] UDP beacon fallback for restrictive subnets.
-- [ ] Dynamic peer directory tracking discovered nodes, addresses, and signal freshness.
+- [x] mDNS / DNS-SD service broadcasting and discovery (`bridge-discovery`).
+- [x] UDP beacon fallback for restrictive subnets (`bridge-discovery`).
+- [x] Dynamic peer directory tracking discovered nodes, addresses, and signal freshness.
+- [x] Unified multi-channel discovery coordinating mDNS and UDP beacon fallback over shared directory.
 
 ## Milestone 2: Pairing & Cryptographic Trust Store
 **Objective:** Cryptographic mutual authentication and pairing ceremony.

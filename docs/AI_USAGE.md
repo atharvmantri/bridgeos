@@ -44,6 +44,18 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Added unit test suite covering chunk validation, corrupted chunk rejection, root hash mismatch detection, empty files, and resumption.
   - Implemented Milestone 2 end-to-end integration tests (`milestone2_transfer.rs`) demonstrating full TCP file streaming and mid-flight network interruption with resumption.
   - Documented architectural decision ADR-0008 in `docs/DECISIONS.md`.
-  - Updated `docs/STATE.md` and `docs/TASKS.md`.
+### 2026-09-17: Milestone 1 UDP Broadcast Beacon Fallback & Unified Discovery (BRG-DISC-002)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Designed and implemented bounded UDP discovery beacon format (`BRGB` magic prefix, version 1 byte, Postcard serialized envelope, max 1400 bytes).
+  - Implemented `BeaconMessage` supporting periodic `Announcement`, explicit `Goodbye`, and immediate `Query` probes (`beacon.rs`).
+  - Implemented `UdpDiscovery` daemon supporting `SO_REUSEADDR` broadcast socket binding, immediate query probes upon network entry, periodic heartbeats, explicit goodbye broadcasts upon shutdown, and self-discovery prevention (`udp.rs`).
+  - Enhanced `PeerDirectory` with address deduplication and multi-homed address merging across discovery channels (`peer.rs`).
+  - Implemented `UnifiedDiscovery` coordinating both mDNS and UDP fallback concurrently over a shared directory and event bus (`unified.rs`).
+  - Added unit test suite for beacon encoding/decoding, packet bounds, UDP discovery lifecycle, and unified discovery modes.
+  - Added integration test suite (`crates/bridge-discovery/tests/udp_discovery_test.rs`) covering live discovery, query probe immediate response, goodbye departure, and TTL expiry.
+  - Added end-to-end integration test (`tests/integration/tests/milestone1_discovery.rs`) validating live UDP beacon discovery followed by dynamic TCP connection establishment and mutual Ed25519 authentication.
+  - Documented architectural decision ADR-0009 in `docs/DECISIONS.md`.
+  - Updated `docs/STATE.md`, `docs/TASKS.md`, and `docs/ROADMAP.md`.
 
 

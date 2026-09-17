@@ -179,6 +179,28 @@ impl MdnsDiscovery {
         })
     }
 
+    /// Creates a new `MdnsDiscovery` instance sharing an existing peer directory and event bus.
+    pub fn with_directory_and_events(
+        config: DiscoveryConfig,
+        directory: PeerDirectory,
+        event_tx: broadcast::Sender<DiscoveryEvent>,
+    ) -> Result<Self> {
+        let daemon = ServiceDaemon::new()
+            .map_err(|e| DiscoveryError::Mdns(format!("failed to create ServiceDaemon: {e}")))?;
+
+        Ok(Self {
+            daemon,
+            config,
+            directory,
+            fullname_to_node: Arc::new(RwLock::new(HashMap::new())),
+            local_node_id: Arc::new(RwLock::new(None)),
+            registered_fullname: Arc::new(Mutex::new(None)),
+            event_tx,
+            shutdown_tx: None,
+            task_handles: Vec::new(),
+        })
+    }
+
     /// Accesses the underlying peer directory.
     pub fn directory(&self) -> &PeerDirectory {
         &self.directory

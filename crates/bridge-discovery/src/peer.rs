@@ -72,7 +72,11 @@ impl PeerDirectory {
             existing.device_name = peer.device_name;
             existing.device_type = peer.device_type;
             existing.capabilities = peer.capabilities;
-            existing.addresses = peer.addresses;
+            for addr in peer.addresses {
+                if !existing.addresses.contains(&addr) {
+                    existing.addresses.push(addr);
+                }
+            }
             existing.last_seen = SystemTime::now();
             (existing.clone(), false)
         } else {

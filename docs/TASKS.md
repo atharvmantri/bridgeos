@@ -114,3 +114,22 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 - **Dependencies:** BRG-CORE-001, BRG-PROTO-001, BRG-TRANS-001
 - **Verification:** `cargo test -p bridge-transfer && cargo test --test milestone2_transfer`
 
+---
+
+### BRG-DISC-002: UDP Broadcast Beacon Fallback & Unified LAN Discovery
+- **Status:** DONE
+- **Subsystem:** discovery
+- **Goal:** Implement UDP broadcast beacon fallback for restricted LANs blocking mDNS multicast, and provide unified discovery coordinating mDNS and UDP beaconing over a shared peer directory.
+- **Acceptance Criteria:**
+  - Bounded beacon packet encoding/decoding with magic header `BRGB`, protocol version, and Postcard envelope.
+  - Broadcast beacon sender and listener with configurable broadcast port, targets, and beacon interval.
+  - Immediate `Query` probe on startup to rapidly discover peers without waiting for next beacon interval.
+  - Explicit `Goodbye` announcement on shutdown to notify peers of departure immediately.
+  - Protects against self-discovery and safely discards malformed/oversized packets.
+  - Address list deduplication and merge in `PeerDirectory` with TTL heartbeat pruning.
+  - `UnifiedDiscovery` coordinating both mDNS and UDP fallback with shared directory and event bus.
+  - Comprehensive unit and integration tests verifying discovery, query response, goodbye departure, and TTL expiry.
+- **Relevant Files:** `Cargo.toml`, `crates/bridge-discovery/Cargo.toml`, `crates/bridge-discovery/src/beacon.rs`, `crates/bridge-discovery/src/udp.rs`, `crates/bridge-discovery/src/unified.rs`, `crates/bridge-discovery/src/peer.rs`, `crates/bridge-discovery/src/error.rs`, `crates/bridge-discovery/src/lib.rs`, `crates/bridge-discovery/tests/udp_discovery_test.rs`
+- **Dependencies:** BRG-CORE-001, BRG-DISC-001
+- **Verification:** `cargo test -p bridge-discovery`
+
