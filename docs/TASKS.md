@@ -154,19 +154,37 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-PAIR-001: Explicit Secure Pairing & Persistent Trust Store
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** identity
 - **Goal:** Implement explicit out-of-band verified peer pairing (SAS verification / QR codes) and persistent SQLite-backed cryptographic trust storage to establish trust boundaries beyond zero-trust LAN discovery.
 - **Acceptance Criteria:**
   - `TrustStore` abstraction backed by SQLite database with schema versioning and transactional updates.
-  - Stores trusted peer records (`node_id`, `public_key`, `device_name`, `device_type`, `first_paired_at`, `last_seen_at`, `revocation_state`).
-  - Strict separation of private device key (file system storage with restricted permissions) and trusted peer directory (SQLite).
-  - Explicit pairing ceremony state machine: initiation, mutual key exchange, SAS (Short Authentication String) derivation, human confirmation, persistence.
+  - Stores trusted peer records (`node_id`, `public_key`, `device_name`, `device_type`, `first_paired_at`, `last_seen_at`, `trust_state`).
+  - Strict separation of private device key (isolated file system storage with restricted permissions) and trusted peer directory (SQLite).
+  - Explicit pairing ceremony state machine: initiation, mutual key exchange, symmetric SAS (Short Authentication String) derivation, human confirmation, persistence.
   - Rejection of unknown, unverified, or revoked peers during session establishment.
   - Rejection of spoofed NodeIds presenting a different public key than recorded in the trust store.
-  - Comprehensive unit and integration tests covering successful pairing, user rejection, SAS mismatch, reconnection after restart, and trust revocation.
-- **Relevant Files:** `crates/bridge-identity/Cargo.toml`, `crates/bridge-identity/src/trust.rs`, `crates/bridge-identity/src/pairing.rs`, `crates/bridge-identity/src/lib.rs`
+  - Comprehensive unit and integration tests covering successful pairing, user rejection, SAS symmetry, reconnection after restart, and trust revocation.
+- **Relevant Files:** `crates/bridge-identity/Cargo.toml`, `crates/bridge-identity/src/trust.rs`, `crates/bridge-identity/src/pairing.rs`, `crates/bridge-identity/src/storage.rs`, `crates/bridge-identity/src/error.rs`, `crates/bridge-identity/src/lib.rs`, `crates/bridge-identity/tests/pairing_and_trust_test.rs`
 - **Dependencies:** BRG-CORE-001, BRG-IDN-001, BRG-PROTO-001
 - **Verification:** `cargo test -p bridge-identity`
+
+---
+
+### BRG-CLIP-001: Cross-Device Clipboard Synchronization Engine
+- **Status:** TODO
+- **Subsystem:** continuity
+- **Goal:** Build the bidirectional clipboard synchronization engine (`bridge-clipboard`) for text and image payloads, with encryption, size budgeting, loopback echo suppression, and deduplication.
+- **Acceptance Criteria:**
+  - Clipboard payload representation supporting plain text, rich text, and bounded images (PNG/JPEG).
+  - Loopback suppression using blake3 hash cache to prevent echo oscillations between connected peers.
+  - Bounded clipboard size limits (e.g. max 10MB text/images) with graceful truncation or rejection.
+  - OS clipboard integration abstraction / traits for platform adapters (Windows Win32, Android Jetpack).
+  - Integration with `bridge_protocol::DataFrame` over `CHANNEL_CLIPBOARD`.
+  - Comprehensive unit and integration tests verifying deduplication, payload framing, and echo avoidance.
+- **Relevant Files:** `Cargo.toml`, `crates/bridge-clipboard/Cargo.toml`, `crates/bridge-clipboard/src/lib.rs`
+- **Dependencies:** BRG-CORE-001, BRG-IDN-001, BRG-PAIR-001, BRG-PROTO-001, BRG-TRANS-001
+- **Verification:** `cargo test -p bridge-clipboard`
+
 
 

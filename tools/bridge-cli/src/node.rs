@@ -284,9 +284,7 @@ pub async fn handle_connection(
             }
             Frame::Control(ControlFrame::Pong { .. }) => {}
             Frame::Control(ControlFrame::Disconnect { reason }) => {
-                println!(
-                    "[Session] Peer '{client_name}' disconnected gracefully: {reason:?}"
-                );
+                println!("[Session] Peer '{client_name}' disconnected gracefully: {reason:?}");
                 break;
             }
             Frame::Data(DataFrame { channel, payload }) => {

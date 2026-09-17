@@ -73,5 +73,17 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Added unit and integration test suite (`tests/cli_tests.rs`) covering CLI arguments, ping/pong roundtrips, multi-chunk file transfers, and imposter signature rejections.
   - Documented architectural decision ADR-0010 in `docs/DECISIONS.md`.
   - Updated `docs/STATE.md` and `docs/TASKS.md`.
+---
 
-
+### 2026-09-17: Out-of-Band Explicit SAS Pairing Ceremony & SQLite Trust Store (BRG-PAIR-001)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Designed and implemented explicit out-of-band Short Authentication String (SAS) 6-digit numeric PIN verification protocol (`SasVerification`, `PairingSession`).
+  - Formulated symmetric, order-independent SAS code derivation using Blake3 hash of canonically sorted node IDs and pairing nonces.
+  - Implemented mutual cryptographic signature confirmation preventing MITM relay and spoofing attacks.
+  - Built SQLite-backed `TrustStore` with WAL journaling, schema versioning, and ACID persistence for trusted nodes.
+  - Built zero-trust LAN validation with strict public-key consistency enforcement (`TrustStore::is_trusted`), detecting and rejecting key-substitution / node impersonation attempts with `IdentityError::KeyMismatch`.
+  - Implemented `IdentityStorage` providing isolated local secret key file persistence with restricted filesystem permissions (0600 on Unix) isolated from public trust database.
+  - Added comprehensive test suite (`crates/bridge-identity/tests/pairing_and_trust_test.rs`) verifying SQLite CRUD, disk restart persistence, symmetric SAS code matching, mutual signature confirmation, user rejection, impersonation defense, and local secret key security.
+  - Documented architectural decision ADR-0011 in `docs/DECISIONS.md`.
+  - Updated `docs/STATE.md` and `docs/TASKS.md`.
