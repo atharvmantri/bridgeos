@@ -84,6 +84,10 @@ pub enum Commands {
         /// Disable UDP broadcast beaconing
         #[arg(long, default_value_t = false)]
         no_udp: bool,
+
+        /// Use in-memory clipboard instead of native OS clipboard
+        #[arg(long, default_value_t = false)]
+        memory_clipboard: bool,
     },
 
     /// Performs passive and active LAN discovery to list discovered peers
@@ -263,6 +267,7 @@ pub async fn execute_cli(cli: Cli) -> Result<()> {
             broadcast_port,
             no_mdns,
             no_udp,
+            memory_clipboard,
         } => {
             let dev_type = DeviceType::from_str(&device_type).unwrap_or(DeviceType::Windows);
             let config = NodeConfig {
@@ -274,6 +279,7 @@ pub async fn execute_cli(cli: Cli) -> Result<()> {
                 broadcast_port,
                 enable_mdns: !no_mdns,
                 enable_udp: !no_udp,
+                memory_clipboard,
             };
             node::run_node(config).await?;
         }

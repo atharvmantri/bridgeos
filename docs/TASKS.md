@@ -221,7 +221,7 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 ---
 
 ### BRG-WINCLIP-001: Native Windows Clipboard Backend
-- **Status:** TODO
+- **Status:** DONE
 - **Subsystem:** continuity
 - **Goal:** Implement a real native Windows clipboard backend in `bridge-clipboard` (`WindowsClipboardBackend`) implementing `ClipboardBackend` using safe Win32 API interactions.
 - **Acceptance Criteria:**
@@ -229,10 +229,28 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
   - Gracefully handles clipboard locking/contention with exponential backoff retry.
   - Event-driven clipboard change monitoring using Win32 clipboard listener hooks (`AddClipboardFormatListener`).
   - Clean shutdown and background worker thread lifecycle.
-  - Connects to `bridge-cli node` when running on Windows.
-- **Relevant Files:** `crates/bridge-clipboard/Cargo.toml`, `crates/bridge-clipboard/src/backend/windows.rs`, `tools/bridge-cli/`
+  - Connects to `bridge-cli node` by default when running on Windows, with `--memory-clipboard` flag available.
+  - Comprehensive unit and integration tests verifying text read/write, event notifications, and clean teardown.
+- **Relevant Files:** `crates/bridge-clipboard/Cargo.toml`, `crates/bridge-clipboard/src/backend/mod.rs`, `crates/bridge-clipboard/src/backend/windows.rs`, `crates/bridge-clipboard/src/backend/memory.rs`, `tools/bridge-cli/src/node.rs`, `tools/bridge-cli/src/lib.rs`, `tools/bridge-cli/tests/cli_tests.rs`
 - **Dependencies:** BRG-CLIP-001, BRG-SESSION-001, BRG-CLIP-002
-- **Verification:** `cargo test -p bridge-clipboard`
+- **Verification:** `cargo test -p bridge-clipboard -- --test-threads=1`
+
+---
+
+### BRG-NOTIF-001: Cross-Device Notification Mirroring Protocol & Engine
+- **Status:** TODO
+- **Subsystem:** continuity
+- **Goal:** Design and implement cross-device notification synchronization (`bridge-notifications`) over protocol channel 3 (`CHANNEL_NOTIFICATIONS`) with notification state, actions (dismiss, reply), deduplication, and privacy filtering.
+- **Acceptance Criteria:**
+  - Standardized notification envelope (`NotificationEntry`) supporting app ID, title, text, timestamp, urgency, icon hash, and dismiss/action flags.
+  - Bounded ring buffer for active notifications and dismiss synchronization.
+  - Action synchronization allowing remote dismissal and canned text reply transmission.
+  - Privacy policy filtering sensitive notification categories (banking, 2FA codes, password managers).
+  - Integration with `bridge-session` application channels.
+- **Relevant Files:** `crates/bridge-notifications/`
+- **Dependencies:** BRG-CORE-001, BRG-PROTO-001, BRG-SESSION-001
+- **Verification:** `cargo test -p bridge-notifications`
+
 
 
 

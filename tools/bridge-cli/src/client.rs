@@ -487,7 +487,7 @@ pub async fn run_peers(duration_secs: u64, broadcast_port: u16, data_dir: &Path)
         None
     };
 
-    println!("Scanning local LAN for BridgeOS peers for {duration_secs} seconds...",);
+    println!("Scanning local LAN for BridgeOS peers for {duration_secs} seconds...");
 
     let udp_cfg = UdpConfig {
         broadcast_port,

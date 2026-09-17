@@ -32,6 +32,7 @@ pub struct NodeConfig {
     pub broadcast_port: u16,
     pub enable_mdns: bool,
     pub enable_udp: bool,
+    pub memory_clipboard: bool,
 }
 
 /// Runs a persistent, interactive BridgeOS peer node.
@@ -68,7 +69,37 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
     );
 
     // 2. Clipboard Synchronization Engine
-    let clip_backend = Arc::new(MemoryClipboardBackend::new());
+    let (clip_backend, backend_name): (Arc<dyn bridge_clipboard::ClipboardBackend>, &'static str) =
+        if config.memory_clipboard {
+            (Arc::new(MemoryClipboardBackend::new()), "In-Memory")
+        } else {
+            #[cfg(windows)]
+            {
+                match bridge_clipboard::WindowsClipboardBackend::new() {
+                    Ok(b) => {
+                        info!("Using native Windows event-driven clipboard backend");
+                        (Arc::new(b), "Native OS (Windows Win32 Event-Driven)")
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to initialize native Windows clipboard ({e}); falling back to in-memory clipboard"
+                        );
+                        (
+                            Arc::new(MemoryClipboardBackend::new()),
+                            "In-Memory (Windows Init Fallback)",
+                        )
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                (
+                    Arc::new(MemoryClipboardBackend::new()),
+                    "In-Memory (Non-Windows Platform Fallback)",
+                )
+            }
+        };
+
     let clip_engine = Arc::new(ClipboardSyncEngine::new(
         node_id,
         clip_backend.clone(),
@@ -108,6 +139,7 @@ pub async fn run_node(config: NodeConfig) -> Result<()> {
     println!("  Node ID:       {node_id}");
     println!("  Device Type:   {:?}", config.device_type);
     println!("  TCP Listener:  0.0.0.0:{actual_port}");
+    println!("  Clipboard:     {backend_name}");
     println!("  Data Dir:      {}", config.data_dir.display());
     println!("  Receive Dir:   {}", config.receive_dir.display());
     println!("  mDNS Enabled:  {}", config.enable_mdns);

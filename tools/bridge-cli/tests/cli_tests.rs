@@ -40,6 +40,7 @@ fn test_cli_parsing_node() {
             no_mdns,
             no_udp,
             data_dir: _,
+            memory_clipboard: _,
         } => {
             assert_eq!(name, "desktop-a");
             assert_eq!(port, 9801);
@@ -48,6 +49,20 @@ fn test_cli_parsing_node() {
             assert_eq!(broadcast_port, 42425);
             assert!(no_mdns);
             assert!(no_udp);
+        }
+        _ => panic!("Expected Commands::Node"),
+    }
+}
+
+#[test]
+fn test_cli_parsing_node_memory_clipboard() {
+    let args = vec!["bridge-cli", "node", "--memory-clipboard"];
+    let cli = Cli::try_parse_from(args).expect("Failed to parse node command");
+    match cli.command {
+        Commands::Node {
+            memory_clipboard, ..
+        } => {
+            assert!(memory_clipboard);
         }
         _ => panic!("Expected Commands::Node"),
     }

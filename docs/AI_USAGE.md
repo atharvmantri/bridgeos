@@ -115,3 +115,20 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Added session integration test suite (`crates/bridge-session/tests/session_test.rs`) and CLI security tests (`tools/bridge-cli/tests/cli_tests.rs`).
   - Documented architectural decision ADR-0013 in `docs/DECISIONS.md`.
   - Updated `docs/STATE.md` and `docs/TASKS.md`.
+
+---
+
+### 2026-09-17: Native Windows Clipboard Integration (BRG-WINCLIP-001)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Modularized `crates/bridge-clipboard/src/backend/` into `mod.rs`, `memory.rs`, and `windows.rs`.
+  - Implemented `WindowsClipboardBackend` utilizing direct Win32 API bindings via `windows-sys` (`0.59`) without heavy third-party GUI dependencies.
+  - Implemented event-driven clipboard monitoring using a dedicated Win32 message-only window (`HWND_MESSAGE`) registered with `AddClipboardFormatListener`, listening for `WM_CLIPBOARDUPDATE` messages with zero CPU polling overhead.
+  - Implemented Unicode UTF-16 text reading and writing (`CF_UNICODETEXT`) using `GlobalAlloc`, `GlobalLock`, `GlobalUnlock`, and `SetClipboardData`.
+  - Added exponential backoff retry for OS clipboard access contention to gracefully handle transient locks from external applications.
+  - Added in-process synchronization with `Arc<Mutex<()>>` preventing race conditions between the event listener pump and direct read/write calls.
+  - Connected `WindowsClipboardBackend` into `tools/bridge-cli` node execution by default on Windows platforms, with `--memory-clipboard` flag available for isolated testing or headless environments.
+  - Added unit tests for native Windows clipboard text roundtrip, event notifications, and clean teardown.
+  - Documented architectural decision ADR-0014 in `docs/DECISIONS.md`.
+  - Updated `docs/STATE.md` and `docs/TASKS.md`.
+

@@ -44,6 +44,19 @@ Every capability listed below is fully implemented, strictly linted, and verifie
   - Per-chunk Blake3 checksum validation and whole-file Blake3 root hash integrity verification.
   - Wire protocol message envelopes (`TransferMessage::{Offer, Accept, Data, Ack, Finished, Complete, Cancel}`) mapped onto protocol data channels.
 
+- **Explicit Pairing & Cryptographic Trust Store (`bridge-identity`):**
+  - Out-of-band Short Authentication String (SAS) 6-digit numeric PIN verification ceremony preventing MITM attacks.
+  - Embedded SQLite database (`TrustStore`) with WAL mode and schema migrations for persistent trusted peer authorization.
+  - Cryptographic impersonation detection: instantly detects and rejects key-substitution attacks against known `NodeId`s.
+  - Isolated disk storage for local private device keys (`IdentityStorage`) separated from the public trust directory.
+
+- **Cross-Device Clipboard Sync & Windows Integration (`bridge-clipboard`, `bridge-session`):**
+  - Live bidirectional text clipboard synchronization across authenticated and trusted nodes over protocol channel 1 (`DataFrame::CHANNEL_CLIPBOARD`).
+  - Zero-polling event-driven Windows backend (`WindowsClipboardBackend`) using Win32 `AddClipboardFormatListener` and `HWND_MESSAGE`.
+  - Native Unicode UTF-16 (`CF_UNICODETEXT`) reading and writing with exponential backoff contention retry.
+  - Strict O(1) loopback echo suppression (`EchoGuard`) preventing ping-pong synchronization storms.
+  - Strict zero-trust gating: untrusted, unknown, or revoked peers are hard-blocked from injecting clipboard updates or streaming files.
+
 ---
 
 ## Security Architecture
@@ -51,11 +64,15 @@ Every capability listed below is fully implemented, strictly linted, and verifie
 1. **Zero-Trust LAN Boundary:**
    Physical presence on the same Wi-Fi or local subnet **never implies trust**. Discovery beacons (both mDNS and UDP) are treated strictly as unauthenticated transport hints.
 2. **Mutual Cryptographic Authentication:**
-   No application data or file payload is exchanged until both peers successfully verify Ed25519 digital signatures over mutual cryptographic nonces during the connection handshake.
-3. **Bounded Allocations:**
-   Strict buffer limits are enforced prior to allocation: maximum 1400 bytes for discovery datagrams, 64 bytes for device names, and 16 MB for stream frames.
-4. **Audited Cryptographic Primitives:**
-   BridgeOS never rolls custom ciphers. All identity and hashing mechanisms utilize established, widely audited crates: `ed25519-dalek`, `blake3`, `sha2`, and `rand`.
+   No application session is established until both peers successfully verify Ed25519 digital signatures over mutual cryptographic nonces during the connection handshake.
+3. **Explicit Out-of-Band Pairing:**
+   Application channels (`CHANNEL_CLIPBOARD`, `CHANNEL_FILE_TRANSFER`) remain blocked until both peers confirm an identical 6-digit SAS numeric PIN code during an explicit pairing ceremony.
+4. **Impersonation Defense:**
+   If a known, previously paired `NodeId` attempts to connect with a different public key, the session is aborted immediately.
+5. **Bounded Allocations:**
+   Strict buffer limits are enforced prior to allocation: maximum 1400 bytes for discovery datagrams, 64 bytes for device names, 2MB for text clipboard, and 16 MB for stream frames.
+6. **Audited Cryptographic Primitives:**
+   BridgeOS never rolls custom ciphers. All identity, signing, and hashing mechanisms utilize established, widely audited crates: `ed25519-dalek`, `blake3`, `sha2`, and `rand`.
 
 For the complete threat model and security specifications, see [SECURITY.md](docs/SECURITY.md).
 
@@ -70,61 +87,71 @@ bridgeos/
 ├── crates/
 │   ├── bridge-core/        # Shared types: NodeId, DeviceType, ProtocolVersion, Capabilities
 │   ├── bridge-protocol/    # Wire frames, magic headers, codecs, handshake messages
-│   ├── bridge-identity/    # Ed25519 key generation, signing, challenge verification
+│   ├── bridge-identity/    # Ed25519 key generation, signing, SAS pairing, SQLite TrustStore
 │   ├── bridge-discovery/   # mDNS daemon, UDP broadcast fallback, unified peer directory
 │   ├── bridge-transport/   # Async length-delimited framed stream (Tokio)
-│   └── bridge-transfer/    # 64KB chunked resumable file streaming engine (Blake3)
+│   ├── bridge-transfer/    # 64KB chunked resumable file streaming engine (Blake3)
+│   ├── bridge-clipboard/   # Clipboard sync engine, EchoGuard, Win32 format listener
+│   └── bridge-session/     # Connection lifecycle state machine, pairing & channel gating
 ├── apps/
 │   ├── desktop/            # Tauri desktop shell with React & TypeScript (in development)
 │   └── android/            # Android Kotlin client (in development)
 ├── services/
 │   └── relay/              # Zero-knowledge end-to-end encrypted relay daemon (planned)
-├── tools/                  # Developer CLI tools and test harnesses (in development)
+├── tools/
+│   └── bridge-cli/         # Multi-node developer CLI and live test harness
 ├── tests/
 │   └── integration/        # Multi-node integration test harness
 └── docs/                   # Engineering ledgers and architectural documentation
-    ├── ARCHITECTURE.md     # Subsystem decomposition and concurrency model
-    ├── PROTOCOL.md         # Wire framing format and handshake specification
-    ├── ROADMAP.md          # Multi-milestone progress and planning
-    ├── TASKS.md            # Actionable engineering backlog
-    ├── STATE.md            # Compact current-state ledger
-    ├── DECISIONS.md        # Architecture Decision Records (ADRs)
-    ├── SECURITY.md         # Threat model and trust boundaries
-    ├── TESTING.md          # Test strategy and execution commands
-    └── AI_USAGE.md         # Transparent record of AI-assisted engineering
 ```
 
 ---
 
-## Getting Started
+## Two-Node Quickstart (Live Demo)
 
-### Prerequisites
+You can launch and test two autonomous BridgeOS nodes on the same machine or across LAN devices using `bridge-cli`.
 
-- [Rust](https://www.rust-lang.org/tools/install) (stable 1.83+ recommended, edition 2021)
-- Cargo (included with Rust)
-- Operating Systems: Windows 10/11, Linux, macOS
-
-### Building
-
-Build the entire workspace in release or debug mode:
-
+### 1. Launch Node A (Terminal 1)
 ```bash
-cargo build --workspace
+cargo run -p bridge-cli -- node \
+  --name desktop-a \
+  --port 45100 \
+  --data-dir ./dev-a
 ```
 
-### Running Tests
-
-Run the complete test suite across all workspace crates and integration harnesses:
-
+### 2. Launch Node B (Terminal 2)
 ```bash
-# Run all unit and multi-node integration tests
-cargo test --workspace
+cargo run -p bridge-cli -- node \
+  --name desktop-b \
+  --port 45101 \
+  --data-dir ./dev-b
+```
 
-# Run strict clippy linter across all targets
-cargo clippy --workspace --all-targets -- -D warnings
+Both nodes will initialize their persistent identity keys, open their local `trust.db`, start their native Win32 clipboard format listeners, and broadcast their availability via mDNS and UDP.
 
-# Verify formatting
-cargo fmt --check
+### 3. Check Discovered Peers & Pair (Terminal 3)
+```bash
+# View active peers discovered on LAN with trust authorization status:
+cargo run -p bridge-cli -- peers --data-dir ./dev-b
+
+# Pair Node B with Node A:
+cargo run -p bridge-cli -- pair --peer 127.0.0.1:45100 --name desktop-b --data-dir ./dev-b
+```
+1. Both nodes will derive an identical symmetric 6-digit SAS code (e.g. `123 456`).
+2. Confirm the PIN in Terminal 3 and Terminal 1 (`y`).
+3. Trust is persisted to `trust.db`.
+4. The application session opens immediately! Any text copied to the Windows clipboard on Node A will instantly synchronize to the Windows clipboard on Node B (and vice-versa) with zero echo loops.
+
+### 4. Manage Trust & Stream Files
+```bash
+# List all trusted peers:
+cargo run -p bridge-cli -- trust list --data-dir ./dev-b
+
+# Stream a file to Node A:
+cargo run -p bridge-cli -- send-file --peer 127.0.0.1:45100 --file ./README.md --data-dir ./dev-b
+
+# Revoke a peer (subsequent file transfers & clipboard updates will be blocked):
+cargo run -p bridge-cli -- trust revoke --node-id <NODE_ID> --data-dir ./dev-b
 ```
 
 ---
@@ -136,8 +163,9 @@ cargo fmt --check
 | **M0** | Core & Handshake | **COMPLETED** | Workspace layout, framing codec, Ed25519 identity, authenticated handshake |
 | **M1** | Discovery & Directory | **COMPLETED** | mDNS zero-config, UDP broadcast beacon fallback, dynamic peer directory |
 | **M2** | Transfer Engine | **COMPLETED** | 64KB chunk streaming, Blake3 hash verification, interrupted transfer resumption |
-| **M2** | Pairing & Trust Store | *In Progress* | Short Authentication String (SAS) numeric PIN verification, SQLite device store |
-| **M3** | Clipboard Synchronization | *Planned* | Real-time bi-directional clipboard sync with privacy filtering |
+| **M2** | Pairing & Trust Store | **COMPLETED** | SAS 6-digit numeric PIN verification, SQLite persistent TrustStore, impersonation defense |
+| **M3** | Clipboard Synchronization | **COMPLETED** | Live sync engine, loopback echo suppression, native Windows Win32 format listener |
+| **M3** | Notification Mirroring | *Next Up* | Cross-device notification protocol, dismissal sync, privacy filtering |
 | **M4** | Windows Desktop App | *Planned* | Tauri desktop shell, system tray daemon, Windows Explorer integration |
 | **M5** | Android Client | *Planned* | Android Jetpack Compose continuity client, background discovery service |
 | **M6** | Encrypted Relay Daemon | *Planned* | Zero-knowledge end-to-end encrypted relay for NAT traversal |
