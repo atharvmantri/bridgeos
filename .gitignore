@@ -3,7 +3,25 @@
 **/*.rs.bk
 Cargo.lock
 
-# IDE & OS
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.keystore
+*.pk8
+*.priv
+
+# Local Databases & State
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# IDE & Editor Junk
 .idea/
 .vscode/
 *.swp
@@ -11,6 +29,7 @@ Cargo.lock
 *~
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # Node / Web / Desktop UI
 node_modules/
@@ -25,16 +44,24 @@ local.properties
 *.apk
 *.aab
 
-# Temp / Agent artifacts
+# Profiling, Coverage & Diagnostics
+coverage/
+*.profraw
+*.profdata
+*.dmp
+*.crash
+
+# Temp & Logs
 scratch/
 tmp/
+temp/
 *.log
 
-#others
-.env
-.env.*
-.env.local
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-
+# Local Agent Hooks & Tracking Artifacts
+.agents/hooks/
+.agents/*.disabled
+.agents/**/*.json
+.agents/**/*.ps1
+WORKING-global-hooks.json
+WORKING-hackatime-tool.ps1
+.system_generated/
