@@ -133,3 +133,40 @@ This document is the actionable task tracker. Every piece of non-trivial enginee
 - **Dependencies:** BRG-CORE-001, BRG-DISC-001
 - **Verification:** `cargo test -p bridge-discovery`
 
+---
+
+### BRG-CLI-001: Multi-Node Developer CLI Harness (`tools/bridge-cli`)
+- **Status:** DONE
+- **Subsystem:** tools
+- **Goal:** Build an interactive developer CLI (`bridge-cli`) for launching and testing multiple BridgeOS peer nodes from the terminal, with discovery, authenticated sessions, keepalives, and file streaming.
+- **Acceptance Criteria:**
+  - `bridge-cli node --name <NAME> [--port <PORT>] [--receive-dir <DIR>]` runs an active peer node with live discovery, TCP listener, incoming connection handling, and chunked file reception.
+  - `bridge-cli discover [--duration <SECS>]` scans the LAN using `UnifiedDiscovery` and lists active peers with address, type, and capabilities.
+  - `bridge-cli ping --peer <ADDR>` establishes an authenticated TCP session, verifies Ed25519 identity, performs ping/pong, and reports roundtrip latency.
+  - `bridge-cli send-file --peer <ADDR> --file <PATH>` streams an on-disk file to a remote node using `bridge-transfer` (`FileSender`), verifying Blake3 chunk and root hashes.
+  - `bridge-cli identity [--generate]` displays or generates Ed25519 identity keys and public `NodeId`.
+  - Comprehensive `--help` documentation explaining two-node execution in separate terminal windows.
+  - Integration and unit tests validating CLI commands, ping/pong roundtrips, file streaming, and cryptographic signature rejection.
+- **Relevant Files:** `Cargo.toml`, `tools/bridge-cli/Cargo.toml`, `tools/bridge-cli/src/lib.rs`, `tools/bridge-cli/src/main.rs`, `tools/bridge-cli/src/node.rs`, `tools/bridge-cli/src/client.rs`, `tools/bridge-cli/tests/cli_tests.rs`
+- **Dependencies:** BRG-CORE-001, BRG-IDN-001, BRG-PROTO-001, BRG-TRANS-001, BRG-DISC-001, BRG-DISC-002, BRG-XFER-001
+- **Verification:** `cargo test -p bridge-cli && cargo run -p bridge-cli -- --help`
+
+---
+
+### BRG-PAIR-001: Explicit Secure Pairing & Persistent Trust Store
+- **Status:** TODO
+- **Subsystem:** identity
+- **Goal:** Implement explicit out-of-band verified peer pairing (SAS verification / QR codes) and persistent SQLite-backed cryptographic trust storage to establish trust boundaries beyond zero-trust LAN discovery.
+- **Acceptance Criteria:**
+  - `TrustStore` abstraction backed by SQLite database with schema versioning and transactional updates.
+  - Stores trusted peer records (`node_id`, `public_key`, `device_name`, `device_type`, `first_paired_at`, `last_seen_at`, `revocation_state`).
+  - Strict separation of private device key (file system storage with restricted permissions) and trusted peer directory (SQLite).
+  - Explicit pairing ceremony state machine: initiation, mutual key exchange, SAS (Short Authentication String) derivation, human confirmation, persistence.
+  - Rejection of unknown, unverified, or revoked peers during session establishment.
+  - Rejection of spoofed NodeIds presenting a different public key than recorded in the trust store.
+  - Comprehensive unit and integration tests covering successful pairing, user rejection, SAS mismatch, reconnection after restart, and trust revocation.
+- **Relevant Files:** `crates/bridge-identity/Cargo.toml`, `crates/bridge-identity/src/trust.rs`, `crates/bridge-identity/src/pairing.rs`, `crates/bridge-identity/src/lib.rs`
+- **Dependencies:** BRG-CORE-001, BRG-IDN-001, BRG-PROTO-001
+- **Verification:** `cargo test -p bridge-identity`
+
+

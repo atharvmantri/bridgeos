@@ -6,6 +6,7 @@ members = [
     "crates/bridge-discovery",
     "crates/bridge-transport",
     "crates/bridge-transfer",
+    "tools/bridge-cli",
     "tests/integration",
 ]
 resolver = "2"
@@ -50,6 +51,7 @@ thiserror = "2.0"
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4.5", features = ["derive"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

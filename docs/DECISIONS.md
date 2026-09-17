@@ -92,4 +92,14 @@ This document records significant architectural and engineering decisions. Settl
 - **Alternatives Considered:** UDP broadcast-only (rejected: mDNS is the cross-platform zero-config standard for macOS/iOS and zero-permission LAN environments); raw ICMP ping scans (rejected: unprivileged sockets cannot issue raw ICMP on Windows and Android).
 - **Consequences:** Nodes can now discover each other across both mDNS-enabled and mDNS-restricted subnets; `PeerDirectory` merges and deduplicates multi-homed addresses discovered via different channels.
 
+---
+
+## ADR-0010: Developer Multi-Node CLI Harness Architecture (`tools/bridge-cli`)
+- **Date:** 2026-09-17
+- **Status:** Accepted
+- **Decision:** Provide an interactive, developer-focused multi-node CLI harness (`tools/bridge-cli`) exposing commands `node`, `discover`, `ping`, `send-file`, and `identity`. Structure the crate with both library (`bridge_cli`) and binary (`bridge-cli`) targets to allow direct integration testing and embedding.
+- **Reasoning:** Developing a cross-device P2P platform requires real, multi-terminal manual testing workflows before writing desktop UI or mobile applications. Building a developer harness validates that core crates (`bridge-core`, `bridge-identity`, `bridge-protocol`, `bridge-discovery`, `bridge-transport`, `bridge-transfer`) compose cleanly into an end-to-end operational node without code duplication.
+- **Alternatives Considered:** Writing standalone throwaway scripts or manual test programs outside the workspace (rejected: causes code duplication and bit-rot as protocols evolve); relying purely on automated mock tests (rejected: fails to reveal real-world OS socket and terminal UX issues).
+- **Consequences:** Developers can test full two-node continuity workflows (peer discovery, mutual Ed25519 authentication, capability exchange, ping latency, and chunked Blake3 file transfer) on localhost or across LAN devices directly from command-line terminals.
+
 

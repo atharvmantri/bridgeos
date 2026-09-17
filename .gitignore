@@ -65,3 +65,8 @@ temp/
 WORKING-global-hooks.json
 WORKING-hackatime-tool.ps1
 .system_generated/
+
+# AI / Antigravity (Local Agent Artifacts)
+.antigravity/
+.cursor/
+

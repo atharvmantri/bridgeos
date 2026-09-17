@@ -1,0 +1,33 @@
+[package]
+name = "bridge-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "bridge_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bridge-cli"
+path = "src/main.rs"
+
+[dependencies]
+bridge-core = { workspace = true }
+bridge-identity = { workspace = true }
+bridge-protocol = { workspace = true }
+bridge-discovery = { workspace = true }
+bridge-transport = { workspace = true }
+bridge-transfer = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+postcard = { workspace = true }
+
+[lints]
+workspace = true

@@ -58,4 +58,20 @@ This document provides a transparent, auditable log of AI coding agent involveme
   - Documented architectural decision ADR-0009 in `docs/DECISIONS.md`.
   - Updated `docs/STATE.md`, `docs/TASKS.md`, and `docs/ROADMAP.md`.
 
+---
+
+### 2026-09-17: Developer Multi-Node CLI Harness (BRG-CLI-001)
+- **Agent / Engine:** Gemini / Antigravity
+- **Scope & Contributions:**
+  - Designed and implemented `tools/bridge-cli` integrating core protocols, discovery, and file transfer into a real terminal developer harness.
+  - Implemented `bridge-cli node` providing an interactive daemon with dynamic or configured TCP listener, live `UnifiedDiscovery` (mDNS + UDP broadcast), concurrent peer connection handling, and chunked file reception with Blake3 validation.
+  - Implemented `bridge-cli discover` passive and active LAN scanner reporting discovered peer addresses, types, and capability flags.
+  - Implemented `bridge-cli ping` performing full mutual Ed25519 authentication handshakes and reporting roundtrip latency over multiple probes.
+  - Implemented `bridge-cli send-file` streaming on-disk files using `bridge-transfer` (`FileSender`) with dynamic progress and throughput reporting.
+  - Implemented `bridge-cli identity` displaying and generating Ed25519 identity keypairs.
+  - Formatted CLI with comprehensive `--help` documenting multi-terminal workflow examples.
+  - Added unit and integration test suite (`tests/cli_tests.rs`) covering CLI arguments, ping/pong roundtrips, multi-chunk file transfers, and imposter signature rejections.
+  - Documented architectural decision ADR-0010 in `docs/DECISIONS.md`.
+  - Updated `docs/STATE.md` and `docs/TASKS.md`.
+
 
